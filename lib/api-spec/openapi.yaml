@@ -1,0 +1,439 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: fighters
+    description: AI fighter generation and management
+  - name: matchups
+    description: Matchup generation and analysis
+  - name: battle
+    description: Battle narration and recap
+  - name: daily
+    description: Daily challenge
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /fighters/generate:
+    post:
+      operationId: generateFighter
+      tags: [fighters]
+      summary: Generate an AI fighter profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateFighterInput"
+      responses:
+        "200":
+          description: Generated fighter profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fighter"
+
+  /fighters/random:
+    post:
+      operationId: generateRandomFighter
+      tags: [fighters]
+      summary: Generate a random AI fighter
+      responses:
+        "200":
+          description: Randomly generated fighter profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fighter"
+
+  /matchup/generate:
+    post:
+      operationId: generateMatchup
+      tags: [matchups]
+      summary: Generate a matchup analysis for two fighters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateMatchupInput"
+      responses:
+        "200":
+          description: Matchup analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchupAnalysis"
+
+  /battle/narration:
+    post:
+      operationId: generateBattleNarration
+      tags: [battle]
+      summary: Generate pre-fight cinematic intro narration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BattleNarrationInput"
+      responses:
+        "200":
+          description: Pre-fight narration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleNarration"
+
+  /battle/recap:
+    post:
+      operationId: generateBattleRecap
+      tags: [battle]
+      summary: Generate post-fight recap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BattleRecapInput"
+      responses:
+        "200":
+          description: Post-fight recap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleRecap"
+
+  /daily-challenge:
+    get:
+      operationId: getDailyChallenge
+      tags: [daily]
+      summary: Get today's daily challenge matchup
+      responses:
+        "200":
+          description: Today's daily challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyChallenge"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    FighterStats:
+      type: object
+      properties:
+        overall:
+          type: integer
+        power:
+          type: integer
+        speed:
+          type: integer
+        defense:
+          type: integer
+        stamina:
+          type: integer
+        skill:
+          type: integer
+        intelligence:
+          type: integer
+      required:
+        - overall
+        - power
+        - speed
+        - defense
+        - stamina
+        - skill
+        - intelligence
+
+    WrestlingPersona:
+      type: object
+      properties:
+        ringName:
+          type: string
+        nickname:
+          type: string
+        entrancePersona:
+          type: string
+        championshipIntro:
+          type: string
+        ringGearDescription:
+          type: string
+      required:
+        - ringName
+        - nickname
+        - entrancePersona
+        - championshipIntro
+        - ringGearDescription
+
+    Fighter:
+      type: object
+      properties:
+        name:
+          type: string
+        nickname:
+          type: string
+        category:
+          type: string
+        biography:
+          type: string
+        stats:
+          $ref: "#/components/schemas/FighterStats"
+        strengths:
+          type: array
+          items:
+            type: string
+        weaknesses:
+          type: array
+          items:
+            type: string
+        fightingStyle:
+          type: string
+        signatureMove:
+          type: string
+        ultimateFinisher:
+          type: string
+        signatureQuote:
+          type: string
+        archNemesis:
+          type: string
+        archNemesisReason:
+          type: string
+        estimatedDifficulty:
+          type: string
+        funFacts:
+          type: array
+          items:
+            type: string
+        outfitChoice:
+          type: string
+          enum: [plain, signature, wrestling]
+        outfitDescription:
+          type: string
+        wrestlingPersona:
+          $ref: "#/components/schemas/WrestlingPersona"
+        imagePrompt:
+          type: string
+      required:
+        - name
+        - nickname
+        - category
+        - biography
+        - stats
+        - strengths
+        - weaknesses
+        - fightingStyle
+        - signatureMove
+        - ultimateFinisher
+        - signatureQuote
+        - archNemesis
+        - archNemesisReason
+        - estimatedDifficulty
+        - funFacts
+        - outfitChoice
+        - outfitDescription
+        - imagePrompt
+
+    GenerateFighterInput:
+      type: object
+      properties:
+        name:
+          type: string
+        outfitChoice:
+          type: string
+          enum: [plain, signature, wrestling]
+      required:
+        - name
+        - outfitChoice
+
+    GenerateMatchupInput:
+      type: object
+      properties:
+        fighter1:
+          $ref: "#/components/schemas/Fighter"
+        fighter2:
+          $ref: "#/components/schemas/Fighter"
+      required:
+        - fighter1
+        - fighter2
+
+    StatComparison:
+      type: object
+      properties:
+        fighter1Value:
+          type: integer
+        fighter2Value:
+          type: integer
+        winner:
+          type: string
+      required:
+        - fighter1Value
+        - fighter2Value
+        - winner
+
+    MatchupAnalysis:
+      type: object
+      properties:
+        predictedWinner:
+          type: string
+        winnerWinPercentage:
+          type: integer
+        loserWinPercentage:
+          type: integer
+        fighter1Advantages:
+          type: array
+          items:
+            type: string
+        fighter2Advantages:
+          type: array
+          items:
+            type: string
+        powerComparison:
+          $ref: "#/components/schemas/StatComparison"
+        speedComparison:
+          $ref: "#/components/schemas/StatComparison"
+        intelligenceComparison:
+          $ref: "#/components/schemas/StatComparison"
+        specialMoveComparison:
+          type: string
+        fightDifficulty:
+          type: string
+        narrativeExplanation:
+          type: string
+        fightStyle:
+          type: string
+      required:
+        - predictedWinner
+        - winnerWinPercentage
+        - loserWinPercentage
+        - fighter1Advantages
+        - fighter2Advantages
+        - powerComparison
+        - speedComparison
+        - intelligenceComparison
+        - specialMoveComparison
+        - fightDifficulty
+        - narrativeExplanation
+        - fightStyle
+
+    BattleNarrationInput:
+      type: object
+      properties:
+        fighter1:
+          $ref: "#/components/schemas/Fighter"
+        fighter2:
+          $ref: "#/components/schemas/Fighter"
+      required:
+        - fighter1
+        - fighter2
+
+    BattleNarration:
+      type: object
+      properties:
+        intro:
+          type: string
+        fighter1Intro:
+          type: string
+        fighter2Intro:
+          type: string
+        crowdAtmosphere:
+          type: string
+        fullNarration:
+          type: string
+      required:
+        - intro
+        - fighter1Intro
+        - fighter2Intro
+        - crowdAtmosphere
+        - fullNarration
+
+    BattleRecapInput:
+      type: object
+      properties:
+        winner:
+          $ref: "#/components/schemas/Fighter"
+        loser:
+          $ref: "#/components/schemas/Fighter"
+        fightDurationSeconds:
+          type: integer
+        rounds:
+          type: integer
+      required:
+        - winner
+        - loser
+        - fightDurationSeconds
+        - rounds
+
+    BattleRecap:
+      type: object
+      properties:
+        winner:
+          type: string
+        fightTime:
+          type: string
+        fightRating:
+          type: string
+        methodOfVictory:
+          type: string
+        crowdReaction:
+          type: string
+        memorableMoment:
+          type: string
+        fullRecap:
+          type: string
+      required:
+        - winner
+        - fightTime
+        - fightRating
+        - methodOfVictory
+        - crowdReaction
+        - memorableMoment
+        - fullRecap
+
+    DailyChallenge:
+      type: object
+      properties:
+        date:
+          type: string
+        fighter1:
+          $ref: "#/components/schemas/Fighter"
+        fighter2:
+          $ref: "#/components/schemas/Fighter"
+        analysis:
+          $ref: "#/components/schemas/MatchupAnalysis"
+        votesForFighter1:
+          type: integer
+        votesForFighter2:
+          type: integer
+      required:
+        - date
+        - fighter1
+        - fighter2
+        - analysis
+        - votesForFighter1
+        - votesForFighter2
