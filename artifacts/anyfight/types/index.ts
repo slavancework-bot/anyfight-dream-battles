@@ -77,6 +77,29 @@ export interface BattleRecap {
   fullRecap: string;
 }
 
+export type BattleEventType =
+  | "jab"
+  | "heavy_hit"
+  | "critical_hit"
+  | "counter"
+  | "special_move"
+  | "stagger"
+  | "knockdown"
+  | "finishing_blow";
+
+export interface BattleEvent {
+  round: number;
+  time: string;
+  attacker: "fighter1" | "fighter2";
+  defender: "fighter1" | "fighter2";
+  eventType: BattleEventType;
+  damage: number;
+  staminaDamage: number;
+  comboCount?: number;
+  commentary: string;
+  overlayText: string;
+}
+
 export interface SavedFighter extends Fighter {
   savedId: string;
   savedAt: string;
