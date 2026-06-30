@@ -1,191 +1,167 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Animated } from "react-native";
-import Svg, { Circle, Ellipse, G, Line, Path, Polygon } from "react-native-svg";
+import Svg, { Circle, G, Path, Polygon, Rect } from "react-native-svg";
 
-export type FighterPose = "idle" | "attack" | "hit" | "block";
-
-interface PoseData {
-  headCx: number;
-  headCy: number;
-  torso: [number, number, number, number];
-  lUpperArm: [number, number, number, number];
-  lForearm: [number, number, number, number];
-  rUpperArm: [number, number, number, number];
-  rForearm: [number, number, number, number];
-  lThigh: [number, number, number, number];
-  lShin: [number, number, number, number];
-  rThigh: [number, number, number, number];
-  rShin: [number, number, number, number];
-  fistPoints?: string;
-}
-
-const POSES: Record<FighterPose, PoseData> = {
-  idle: {
-    headCx: 40, headCy: 20,
-    torso: [40, 34, 40, 88],
-    lUpperArm: [26, 44, 16, 68],
-    lForearm: [16, 68, 20, 90],
-    rUpperArm: [54, 44, 64, 64],
-    rForearm: [64, 64, 60, 86],
-    lThigh: [36, 88, 28, 118],
-    lShin: [28, 118, 22, 148],
-    rThigh: [44, 88, 52, 116],
-    rShin: [52, 116, 58, 146],
-  },
-  attack: {
-    headCx: 44, headCy: 18,
-    torso: [44, 32, 40, 86],
-    lUpperArm: [32, 44, 18, 66],
-    lForearm: [18, 66, 14, 84],
-    rUpperArm: [52, 40, 70, 38],
-    rForearm: [70, 38, 78, 36],
-    lThigh: [36, 86, 24, 114],
-    lShin: [24, 114, 16, 146],
-    rThigh: [44, 86, 56, 112],
-    rShin: [56, 112, 64, 144],
-    fistPoints: "74,30 82,34 80,42 72,40",
-  },
-  hit: {
-    headCx: 32, headCy: 24,
-    torso: [32, 38, 38, 88],
-    lUpperArm: [26, 50, 10, 38],
-    lForearm: [10, 38, 4, 24],
-    rUpperArm: [40, 50, 28, 36],
-    rForearm: [28, 36, 18, 22],
-    lThigh: [34, 88, 24, 116],
-    lShin: [24, 116, 18, 146],
-    rThigh: [42, 88, 54, 106],
-    rShin: [54, 106, 64, 122],
-  },
-  block: {
-    headCx: 40, headCy: 30,
-    torso: [40, 44, 40, 84],
-    lUpperArm: [34, 52, 22, 44],
-    lForearm: [22, 44, 20, 30],
-    rUpperArm: [46, 52, 58, 44],
-    rForearm: [58, 44, 60, 30],
-    lThigh: [36, 84, 26, 108],
-    lShin: [26, 108, 16, 138],
-    rThigh: [44, 84, 54, 108],
-    rShin: [54, 108, 64, 138],
-  },
-};
+export type FighterPose =
+  | "idle"
+  | "stepForward"
+  | "stepBack"
+  | "jab"
+  | "hook"
+  | "uppercut"
+  | "attack"
+  | "hit"
+  | "block"
+  | "stagger"
+  | "knockdown"
+  | "winner";
 
 interface FighterSpriteProps {
   color: string;
   pose: FighterPose;
   mirrored?: boolean;
   size?: number;
+  skinTone?: string;
+  trunksColor?: string;
+  gloveColor?: string;
+  bootColor?: string;
 }
 
-export default function FighterSprite({ color, pose, mirrored = false, size = 120 }: FighterSpriteProps) {
-  const floatAnim = useRef(new Animated.Value(0)).current;
+const OUTLINE = "#1a0d08";
+const SHADOW = "rgba(0,0,0,0.35)";
+
+function normalizePose(pose: FighterPose) {
+  return pose === "attack" ? "jab" : pose;
+}
+
+function pixelRect(x: number, y: number, width: number, height: number, fill: string, stroke = OUTLINE) {
+  return <Rect key={`${x}-${y}-${width}-${height}-${fill}`} x={x} y={y} width={width} height={height} fill={fill} stroke={stroke} strokeWidth={2} />;
+}
+
+export default function FighterSprite({
+  color,
+  pose,
+  mirrored = false,
+  size = 120,
+  skinTone = "#b87855",
+  trunksColor,
+  gloveColor,
+  bootColor = "#f1efe2",
+}: FighterSpriteProps) {
+  const bounce = useRef(new Animated.Value(0)).current;
+  const activePose = normalizePose(pose);
+  const trunks = trunksColor ?? color;
+  const gloves = gloveColor ?? color;
 
   useEffect(() => {
+    if (activePose !== "idle" && activePose !== "block") return;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(floatAnim, { toValue: -4, duration: 900, useNativeDriver: true }),
-        Animated.timing(floatAnim, { toValue: 0, duration: 900, useNativeDriver: true }),
+        Animated.timing(bounce, { toValue: -4, duration: 420, useNativeDriver: true }),
+        Animated.timing(bounce, { toValue: 0, duration: 420, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [floatAnim]);
+  }, [activePose, bounce]);
 
-  const p = POSES[pose];
-  const sw = 9;
-  const swGlow = 18;
-  const glowColor = color + "44";
-  const lineProps = { strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const poseOffset = activePose === "stepForward" ? 8 : activePose === "stepBack" || activePose === "hit" ? -7 : activePose === "stagger" ? -12 : 0;
+  const bodyTilt = activePose === "stagger" ? "-7 52 74" : activePose === "uppercut" ? "-3 52 74" : activePose === "hook" ? "4 52 74" : undefined;
+  const wrapStyle = mirrored ? { transform: [{ scaleX: -1 }] } : undefined;
 
-  const svgContent = (
-    <Svg
-      width={size}
-      height={size * 2}
-      viewBox="0 0 80 160"
-      style={mirrored ? { transform: [{ scaleX: -1 }] } : undefined}
-    >
-      <G>
-        {/* Glow layer */}
-        <G stroke={glowColor} strokeWidth={swGlow} {...lineProps} fill="none">
-          <Line x1={p.torso[0]} y1={p.torso[1]} x2={p.torso[2]} y2={p.torso[3]} />
-          <Line x1={p.lUpperArm[0]} y1={p.lUpperArm[1]} x2={p.lUpperArm[2]} y2={p.lUpperArm[3]} />
-          <Line x1={p.lForearm[0]} y1={p.lForearm[1]} x2={p.lForearm[2]} y2={p.lForearm[3]} />
-          <Line x1={p.rUpperArm[0]} y1={p.rUpperArm[1]} x2={p.rUpperArm[2]} y2={p.rUpperArm[3]} />
-          <Line x1={p.rForearm[0]} y1={p.rForearm[1]} x2={p.rForearm[2]} y2={p.rForearm[3]} />
-          <Line x1={p.lThigh[0]} y1={p.lThigh[1]} x2={p.lThigh[2]} y2={p.lThigh[3]} />
-          <Line x1={p.lShin[0]} y1={p.lShin[1]} x2={p.lShin[2]} y2={p.lShin[3]} />
-          <Line x1={p.rThigh[0]} y1={p.rThigh[1]} x2={p.rThigh[2]} y2={p.rThigh[3]} />
-          <Line x1={p.rShin[0]} y1={p.rShin[1]} x2={p.rShin[2]} y2={p.rShin[3]} />
-        </G>
+  const sprite = useMemo(() => {
+    if (activePose === "knockdown") {
+      return (
+        <Svg width={size * 1.28} height={size * 0.78} viewBox="0 0 150 96" style={wrapStyle}>
+          <G>
+            <Rect x={16} y={72} width={108} height={10} fill={SHADOW} />
+            <G transform="translate(12 18)">
+              {pixelRect(18, 32, 40, 24, skinTone)}
+              {pixelRect(8, 36, 18, 16, gloves)}
+              {pixelRect(54, 36, 18, 16, gloves)}
+              {pixelRect(56, 24, 18, 22, skinTone)}
+              <Rect x={61} y={28} width={4} height={4} fill={OUTLINE} />
+              <Rect x={54} y={21} width={24} height={7} fill="#3a2018" />
+              {pixelRect(18, 54, 34, 18, trunks)}
+              {pixelRect(50, 58, 34, 14, trunks)}
+              {pixelRect(78, 60, 26, 12, skinTone)}
+              {pixelRect(100, 58, 28, 12, bootColor)}
+              {pixelRect(18, 70, 24, 10, skinTone)}
+              {pixelRect(2, 68, 28, 12, bootColor)}
+              <Rect x={22} y={56} width={24} height={4} fill="#fff" opacity={0.8} />
+            </G>
+          </G>
+        </Svg>
+      );
+    }
 
-        {/* Main body */}
-        <G stroke={color} strokeWidth={sw} {...lineProps} fill="none">
-          <Line x1={p.torso[0]} y1={p.torso[1]} x2={p.torso[2]} y2={p.torso[3]} />
-          <Line x1={p.lUpperArm[0]} y1={p.lUpperArm[1]} x2={p.lUpperArm[2]} y2={p.lUpperArm[3]} />
-          <Line x1={p.lForearm[0]} y1={p.lForearm[1]} x2={p.lForearm[2]} y2={p.lForearm[3]} />
-          <Line x1={p.rUpperArm[0]} y1={p.rUpperArm[1]} x2={p.rUpperArm[2]} y2={p.rUpperArm[3]} />
-          <Line x1={p.rForearm[0]} y1={p.rForearm[1]} x2={p.rForearm[2]} y2={p.rForearm[3]} />
-          <Line x1={p.lThigh[0]} y1={p.lThigh[1]} x2={p.lThigh[2]} y2={p.lThigh[3]} />
-          <Line x1={p.lShin[0]} y1={p.lShin[1]} x2={p.lShin[2]} y2={p.lShin[3]} />
-          <Line x1={p.rThigh[0]} y1={p.rThigh[1]} x2={p.rThigh[2]} y2={p.rThigh[3]} />
-          <Line x1={p.rShin[0]} y1={p.rShin[1]} x2={p.rShin[2]} y2={p.rShin[3]} />
-        </G>
+    const leadGlove =
+      activePose === "jab"
+        ? { x: 90, y: 50, w: 27, h: 19 }
+        : activePose === "hook"
+          ? { x: 76, y: 40, w: 25, h: 20 }
+          : activePose === "uppercut"
+            ? { x: 72, y: 36, w: 22, h: 24 }
+            : activePose === "block"
+              ? { x: 58, y: 35, w: 20, h: 22 }
+              : { x: 70, y: 52, w: 20, h: 20 };
 
-        {/* Joint dots */}
-        <G fill={color} opacity={0.7}>
-          <Circle cx={p.lUpperArm[2]} cy={p.lUpperArm[3]} r={4} />
-          <Circle cx={p.rUpperArm[2]} cy={p.rUpperArm[3]} r={4} />
-          <Circle cx={p.lThigh[2]} cy={p.lThigh[3]} r={4} />
-          <Circle cx={p.rThigh[2]} cy={p.rThigh[3]} r={4} />
-        </G>
+    const rearGlove =
+      activePose === "block"
+        ? { x: 37, y: 37, w: 20, h: 22 }
+        : activePose === "winner"
+          ? { x: 36, y: 4, w: 21, h: 21 }
+          : activePose === "hit" || activePose === "stagger"
+            ? { x: 20, y: 46, w: 20, h: 20 }
+            : { x: 38, y: 48, w: 20, h: 20 };
 
-        {/* Fist (attack pose) */}
-        {p.fistPoints && (
-          <Polygon points={p.fistPoints} fill={color} stroke={color} strokeWidth={2} />
-        )}
-
-        {/* Head glow */}
-        <Circle cx={p.headCx} cy={p.headCy} r={20} fill={glowColor} />
-
-        {/* Head */}
-        <Circle cx={p.headCx} cy={p.headCy} r={15} fill={color + "22"} stroke={color} strokeWidth={3} />
-
-        {/* Eye */}
-        <Circle cx={p.headCx + 6} cy={p.headCy - 2} r={3} fill={color} />
-
-        {/* Hit effect */}
-        {pose === "hit" && (
-          <>
-            <Path
-              d={`M${p.headCx - 2},${p.headCy - 22} L${p.headCx + 4},${p.headCy - 30} L${p.headCx + 8},${p.headCy - 18}`}
-              stroke={color} strokeWidth={2.5} strokeLinecap="round" fill="none" opacity={0.9}
-            />
-            <Path
-              d={`M${p.headCx + 10},${p.headCy - 24} L${p.headCx + 16},${p.headCy - 30} L${p.headCx + 18},${p.headCy - 20}`}
-              stroke={color} strokeWidth={2.5} strokeLinecap="round" fill="none" opacity={0.7}
-            />
-          </>
-        )}
-
-        {/* Block shield highlight */}
-        {pose === "block" && (
-          <Path
-            d="M18,26 L30,18 L50,22 L52,46 L34,54 Z"
-            fill={color + "33"} stroke={color} strokeWidth={2.5} opacity={0.8}
-          />
-        )}
-      </G>
-    </Svg>
-  );
-
-  if (pose === "idle") {
     return (
-      <Animated.View style={{ transform: [{ translateY: floatAnim }] }}>
-        {svgContent}
-      </Animated.View>
+      <Svg width={size} height={size * 1.55} viewBox="0 0 120 176" style={wrapStyle}>
+        <G transform={`translate(${poseOffset} 0)`}>
+          <Rect x={25} y={158} width={70} height={9} fill={SHADOW} />
+          <G transform={bodyTilt ? `rotate(${bodyTilt})` : undefined}>
+            <Polygon points="44,52 71,52 82,92 35,92" fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
+            <Rect x={48} y={47} width={18} height={9} fill={skinTone} stroke={OUTLINE} strokeWidth={2} />
+            <Rect x={40} y={16} width={30} height={34} fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
+            <Rect x={35} y={14} width={36} height={12} fill="#3a2018" stroke={OUTLINE} strokeWidth={2} />
+            <Rect x={65} y={28} width={6} height={8} fill={skinTone} stroke={OUTLINE} strokeWidth={2} />
+            <Rect x={61} y={31} width={5} height={5} fill={OUTLINE} />
+            <Rect x={50} y={43} width={12} height={4} fill={OUTLINE} opacity={0.7} />
+
+            <Path d="M39 58 L24 70 L31 83 L48 68 Z" fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
+            <Path d={activePose === "winner" ? "M45 59 L48 25 L59 28 L57 61 Z" : "M70 58 L85 69 L79 83 L62 68 Z"} fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
+            {pixelRect(rearGlove.x, rearGlove.y, rearGlove.w, rearGlove.h, gloves)}
+            {pixelRect(leadGlove.x, leadGlove.y, leadGlove.w, leadGlove.h, gloves)}
+
+            <Polygon points="34,88 83,88 77,122 41,122" fill={trunks} stroke={OUTLINE} strokeWidth={3} />
+            <Rect x={41} y={88} width={35} height={7} fill="#fff" opacity={0.9} />
+            <Path d="M42 119 L33 146 L46 150 L60 121 Z" fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
+            <Path d="M73 119 L83 145 L69 150 L57 121 Z" fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
+            <Rect x={26} y={144} width={25} height={18} fill={bootColor} stroke={OUTLINE} strokeWidth={3} />
+            <Rect x={64} y={144} width={27} height={18} fill={bootColor} stroke={OUTLINE} strokeWidth={3} />
+            <Rect x={28} y={151} width={21} height={4} fill={trunks} opacity={0.9} />
+            <Rect x={66} y={151} width={23} height={4} fill={trunks} opacity={0.9} />
+
+            {activePose === "hit" || activePose === "stagger" ? (
+              <G>
+                <Path d="M77 18 L90 8 L86 24" stroke="#f4d44c" strokeWidth={4} fill="none" strokeLinejoin="round" />
+                <Path d="M82 39 L101 36" stroke="#fff" strokeWidth={3} fill="none" strokeLinecap="square" />
+              </G>
+            ) : null}
+            {activePose === "block" ? (
+              <G opacity={0.6}>
+                <Rect x={32} y={28} width={52} height={44} fill="#ffffff" opacity={0.14} stroke="#ffffff" strokeWidth={2} />
+              </G>
+            ) : null}
+          </G>
+        </G>
+      </Svg>
     );
+  }, [activePose, bootColor, gloves, poseOffset, size, skinTone, trunks, wrapStyle, bodyTilt]);
+
+  if (activePose === "idle" || activePose === "block") {
+    return <Animated.View style={{ transform: [{ translateY: bounce }] }}>{sprite}</Animated.View>;
   }
 
-  return svgContent;
+  return sprite;
 }

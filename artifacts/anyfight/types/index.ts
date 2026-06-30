@@ -79,12 +79,16 @@ export interface BattleRecap {
 
 export type BattleEventType =
   | "jab"
+  | "hook"
+  | "uppercut"
+  | "block"
   | "heavy_hit"
   | "critical_hit"
   | "counter"
   | "special_move"
   | "stagger"
   | "knockdown"
+  | "ref_count"
   | "finishing_blow";
 
 export interface BattleEvent {
