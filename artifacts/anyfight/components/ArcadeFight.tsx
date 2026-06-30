@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Pressable,
@@ -294,6 +294,7 @@ export function ComboOverlay({ text }: { text: string }) {
 
 export function KOOverlay({ winner, loser, count = 3 }: { winner: Fighter; loser: Fighter; count?: number }) {
   const flash = useRef(new Animated.Value(0)).current;
+  const [displayCount, setDisplayCount] = useState(1);
 
   useEffect(() => {
     Animated.loop(
@@ -304,6 +305,14 @@ export function KOOverlay({ winner, loser, count = 3 }: { winner: Fighter; loser
       { iterations: 4 }
     ).start();
   }, [flash]);
+
+  useEffect(() => {
+    setDisplayCount(1);
+    const timer = setInterval(() => {
+      setDisplayCount((value) => Math.min(count, value + 1));
+    }, 560);
+    return () => clearInterval(timer);
+  }, [count]);
 
   return (
     <View style={styles.fullScreenNoPad}>
@@ -320,7 +329,7 @@ export function KOOverlay({ winner, loser, count = 3 }: { winner: Fighter; loser
               <View style={styles.refBody} />
               <Text style={styles.refText}>COUNT</Text>
             </View>
-            <Text style={styles.countNumber}>{count}</Text>
+            <Text style={styles.countNumber}>{displayCount}</Text>
             <Text style={styles.knockdownText}>KNOCKDOWN!</Text>
           </>
         }
