@@ -25,6 +25,7 @@ interface FighterSpriteProps {
   trunksColor?: string;
   gloveColor?: string;
   bootColor?: string;
+  idleBehavior?: "guard" | "dance" | "stalk" | "hop" | "breathe" | "clap" | "bounce" | "stumble";
 }
 
 const OUTLINE = "#1a0d08";
@@ -47,6 +48,7 @@ export default function FighterSprite({
   trunksColor,
   gloveColor,
   bootColor = "#f1efe2",
+  idleBehavior = "bounce",
 }: FighterSpriteProps) {
   const bounce = useRef(new Animated.Value(0)).current;
   const activePose = normalizePose(pose);
@@ -55,15 +57,17 @@ export default function FighterSprite({
 
   useEffect(() => {
     if (activePose !== "idle" && activePose !== "block") return;
+    const lift = idleBehavior === "hop" ? -10 : idleBehavior === "dance" || idleBehavior === "bounce" ? -5 : idleBehavior === "stumble" ? -7 : idleBehavior === "stalk" ? -2 : -3;
+    const speed = idleBehavior === "breathe" ? 1200 : idleBehavior === "stalk" ? 620 : 420;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(bounce, { toValue: -4, duration: 420, useNativeDriver: true }),
-        Animated.timing(bounce, { toValue: 0, duration: 420, useNativeDriver: true }),
+        Animated.timing(bounce, { toValue: lift, duration: speed, useNativeDriver: true }),
+        Animated.timing(bounce, { toValue: idleBehavior === "stumble" ? 3 : 0, duration: speed, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [activePose, bounce]);
+  }, [activePose, bounce, idleBehavior]);
 
   const poseOffset = activePose === "stepForward" ? 8 : activePose === "stepBack" || activePose === "hit" ? -7 : activePose === "stagger" ? -12 : 0;
   const bodyTilt = activePose === "stagger" ? "-7 52 74" : activePose === "uppercut" ? "-3 52 74" : activePose === "hook" ? "4 52 74" : undefined;
@@ -152,6 +156,20 @@ export default function FighterSprite({
               <G opacity={0.6}>
                 <Rect x={32} y={28} width={52} height={44} fill="#ffffff" opacity={0.14} stroke="#ffffff" strokeWidth={2} />
               </G>
+            ) : null}
+            {activePose === "idle" && idleBehavior === "breathe" ? (
+              <G opacity={0.8}>
+                <Rect x={77} y={23} width={6} height={4} fill="#bfc7d5" />
+                <Rect x={85} y={20} width={4} height={4} fill="#bfc7d5" />
+              </G>
+            ) : null}
+            {activePose === "idle" && idleBehavior === "clap" ? (
+              <G opacity={0.9}>
+                <Path d="M24 42 L16 38 M83 42 L94 38" stroke="#f4d44c" strokeWidth={3} strokeLinecap="square" />
+              </G>
+            ) : null}
+            {activePose === "idle" && idleBehavior === "guard" ? (
+              <Rect x={31} y={35} width={52} height={7} fill="#111" opacity={0.55} />
             ) : null}
           </G>
         </G>

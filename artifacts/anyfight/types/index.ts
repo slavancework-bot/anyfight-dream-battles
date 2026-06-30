@@ -16,6 +16,19 @@ export interface WrestlingPersona {
   ringGearDescription: string;
 }
 
+export interface FighterPersonality {
+  aggression: number;
+  confidence: number;
+  cowardice: number;
+  showmanship: number;
+  discipline: number;
+  humor: number;
+  dirtyFighting: number;
+  sportsmanship: number;
+  riskTaking: number;
+  temper: number;
+}
+
 export interface Fighter {
   name: string;
   nickname: string;
@@ -35,6 +48,7 @@ export interface Fighter {
   outfitChoice: "plain" | "signature" | "wrestling";
   outfitDescription: string;
   wrestlingPersona?: WrestlingPersona;
+  personality?: FighterPersonality;
   imagePrompt: string;
 }
 
@@ -140,6 +154,10 @@ export interface BattleEvent {
   specialGain?: number;
   movement?: "advance" | "close" | "inside" | "hold" | "recoil" | "fall" | "lunge" | "slip" | "retreat" | "celebrate" | "wobble" | "bounce" | "cornered";
   comboCount?: number;
+  momentumOwner?: "fighter1" | "fighter2";
+  storyArc?: "Fast Knockout" | "Underdog Comeback" | "Back-and-Forth War" | "Technical Chess Match" | "Comic Disaster" | "Legendary Battle";
+  crowdReaction?: string;
+  taunt?: string;
   commentary: string;
   overlayText: string;
 }

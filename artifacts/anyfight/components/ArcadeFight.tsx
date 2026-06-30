@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FighterSprite, { type FighterPose } from "@/components/FighterSprite";
-import type { BattleEvent, Fighter } from "@/types";
+import type { BattleEvent, Fighter, FighterPersonality } from "@/types";
 
 const RED = "#e52e21";
 const BLUE = "#1267dd";
@@ -80,6 +80,93 @@ export function formatFightTime(seconds: number) {
   return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
 }
 
+function clampTrait(value: number | undefined, fallback: number) {
+  return Math.max(1, Math.min(100, Math.round(Number.isFinite(value) ? value! : fallback)));
+}
+
+export function personalityFor(fighter: Fighter): FighterPersonality {
+  const text = `${fighter.name} ${fighter.nickname} ${fighter.biography} ${fighter.fightingStyle} ${fighter.signatureMove} ${fighter.strengths?.join(" ")} ${fighter.weaknesses?.join(" ")}`.toLowerCase();
+  const has = (...terms: string[]) => terms.some((term) => text.includes(term));
+  const stats = fighter.stats;
+  const generated = fighter.personality;
+  return {
+    aggression: clampTrait(generated?.aggression, Math.round((safeNumber(stats.power) + safeNumber(stats.skill)) / 2) + (has("tyson", "stalk", "rage", "destroy") ? 18 : 0)),
+    confidence: clampTrait(generated?.confidence, safeNumber(stats.skill) + (has("ali", "joker", "tony stark", "showman") ? 18 : 0)),
+    cowardice: clampTrait(generated?.cowardice, 100 - safeNumber(stats.defense) + (has("mr. bean", "bean", "nervous", "panic") ? 18 : 0)),
+    showmanship: clampTrait(generated?.showmanship, safeNumber(stats.skill) + (has("ali", "joker", "mario", "spider-man", "celebrity") ? 20 : 0)),
+    discipline: clampTrait(generated?.discipline, Math.round((safeNumber(stats.defense) + safeNumber(stats.intelligence)) / 2) + (has("batman", "vader", "samurai") ? 14 : 0)),
+    humor: clampTrait(generated?.humor, 45 + (has("joker", "spider-man", "deadpool", "mr. bean", "bean", "mario") ? 35 : 0)),
+    dirtyFighting: clampTrait(generated?.dirtyFighting, 40 + (has("joker", "villain", "dirty", "cheat", "vader") ? 30 : 0) - (has("ali", "sportsman", "honor") ? 15 : 0)),
+    sportsmanship: clampTrait(generated?.sportsmanship, safeNumber(stats.defense) + (has("ali", "captain", "superman", "honor") ? 20 : 0) - (has("joker", "villain") ? 20 : 0)),
+    riskTaking: clampTrait(generated?.riskTaking, Math.round((safeNumber(stats.power) + safeNumber(stats.speed)) / 2) + (has("spider-man", "mario", "reckless", "stunt") ? 18 : 0)),
+    temper: clampTrait(generated?.temper, 100 - safeNumber(stats.defense) + (has("tyson", "hulk", "rage", "temper") ? 22 : 0)),
+  };
+}
+
+function idleBehaviorFor(fighter: Fighter): "guard" | "dance" | "stalk" | "hop" | "breathe" | "clap" | "bounce" | "stumble" {
+  const name = fighter.name.toLowerCase();
+  if (name.includes("batman")) return "guard";
+  if (name.includes("ali")) return "dance";
+  if (name.includes("tyson")) return "stalk";
+  if (name.includes("mario")) return "hop";
+  if (name.includes("darth vader") || name.includes("vader")) return "breathe";
+  if (name.includes("joker")) return "clap";
+  if (name.includes("spider-man") || name.includes("spiderman")) return "bounce";
+  if (name.includes("mr. bean") || name.includes("bean")) return "stumble";
+  return "bounce";
+}
+
+function tauntFor(fighter: Fighter, defender: Fighter, personality: FighterPersonality) {
+  const base = [
+    "I've fought tougher refrigerators.",
+    "You call that a punch?",
+    "The crowd paid for this?",
+    "That was emotionally damaging.",
+    "I meant to do that.",
+  ];
+  const showman = [
+    `${fighter.nickname || shortName(fighter.name)} says this is now a one-person variety show.`,
+    `${shortName(fighter.name)} asks ${shortName(defender.name)} to aim for the highlight reel.`,
+  ];
+  const respectful = [
+    `${shortName(fighter.name)} nods respectfully, then immediately ruins the moment with a jab.`,
+    `${shortName(fighter.name)} apologizes before throwing another ridiculous punch.`,
+  ];
+  const dirty = [
+    `${shortName(fighter.name)} says the rulebook is more of a suggestion.`,
+    `${shortName(fighter.name)} checks if the ref is blinking. Suspicious timing.`,
+  ];
+  const pool = [
+    ...base,
+    ...(personality.showmanship > 65 ? showman : []),
+    ...(personality.sportsmanship > 65 ? respectful : []),
+    ...(personality.dirtyFighting > 65 ? dirty : []),
+  ];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function crowdLineFor(eventType: BattleEvent["eventType"]) {
+  const big = ["OOOOOOH!", "WHAT JUST HAPPENED?!", "THE CROWD IS LOSING IT!", "ANYFIGHT! ANYFIGHT!"];
+  const sour = ["BOOOOO!", "THE REF IS SWEATING!", "SOMEBODY CHECK THE RULEBOOK!"];
+  if (["illegal_but_awesome", "ref_warning", "wrong_corner"].includes(eventType)) return sour[Math.floor(Math.random() * sour.length)];
+  return big[Math.floor(Math.random() * big.length)];
+}
+
+function chooseStoryArc(fighter1: Fighter, fighter2: Fighter): NonNullable<BattleEvent["storyArc"]> {
+  const p1 = personalityFor(fighter1);
+  const p2 = personalityFor(fighter2);
+  const totalHumor = p1.humor + p2.humor;
+  const totalDiscipline = p1.discipline + p2.discipline + safeNumber(fighter1.stats.intelligence) + safeNumber(fighter2.stats.intelligence);
+  const totalAggression = p1.aggression + p2.aggression + p1.riskTaking + p2.riskTaking;
+  const closeStats = Math.abs(safeNumber(fighter1.stats.overall) - safeNumber(fighter2.stats.overall)) < 9;
+  if (totalHumor > 145 || p1.cowardice + p2.cowardice > 140) return "Comic Disaster";
+  if (totalAggression > 285) return "Fast Knockout";
+  if (totalDiscipline > 300) return "Technical Chess Match";
+  if (closeStats && Math.random() < 0.5) return "Back-and-Forth War";
+  if (!closeStats && Math.random() < 0.45) return "Underdog Comeback";
+  return "Legendary Battle";
+}
+
 export function makeBattleEvents(fighter1: Fighter, fighter2: Fighter): BattleEvent[] {
   type Side = "fighter1" | "fighter2";
   type Template = {
@@ -103,6 +190,10 @@ export function makeBattleEvents(fighter1: Fighter, fighter2: Fighter): BattleEv
   const weakness = (fighter: Fighter) => pick(fighter.weaknesses?.length ? fighter.weaknesses : ["dramatic overthinking"]);
   const nickname = (fighter: Fighter) => fighter.nickname || shortName(fighter.name);
   const move = (fighter: Fighter) => fighter.signatureMove || "Suspiciously Legal Haymaker";
+  const f1Personality = personalityFor(fighter1);
+  const f2Personality = personalityFor(fighter2);
+  const traits = (side: Side) => side === "fighter1" ? f1Personality : f2Personality;
+  const storyArc = chooseStoryArc(fighter1, fighter2);
 
   const templates: Template[] = [
     { eventType: "jab", overlayText: "PEPPER JAB!", damage: 7, staminaDamage: 5, specialGain: 12, movement: "advance", line: (a, d) => `${shortName(a.name)} flicks a jab and ${shortName(d.name)} blinks like the controller disconnected.` },
@@ -134,34 +225,59 @@ export function makeBattleEvents(fighter1: Fighter, fighter2: Fighter): BattleEv
     { eventType: "announcer_meltdown", overlayText: "ANNOUNCER MELTDOWN!", damage: 3, staminaDamage: 4, embarrassmentDamage: 8, specialGain: 10, movement: "bounce", line: (a, d) => `The announcer mispronounces both names, then gives ${shortName(a.name)} credit anyway.` },
     { eventType: "bell_fakeout", overlayText: "BELL FAKEOUT!", damage: 6, staminaDamage: 5, embarrassmentDamage: 6, specialGain: 14, movement: "advance", line: (a, d) => `${shortName(d.name)} hears a bell that did not happen and ${shortName(a.name)} accepts the gift.` },
     { eventType: "shoe_squeak", overlayText: "SQUEAK!", damage: 2, staminaDamage: 4, embarrassmentDamage: 5, specialGain: 9, movement: "slip", line: (a, d) => `${shortName(a.name)} squeaks across the canvas with elite sneaker-based intimidation.` },
+    { eventType: "crowd_confused", overlayText: "MOUTHPIECE LAUNCHED!", damage: 3, staminaDamage: 5, embarrassmentDamage: 10, specialGain: 12, movement: "wobble", line: (a, d) => `${shortName(d.name)}'s mouthpiece flies into the audience and someone catches it like a foul ball.` },
+    { eventType: "ref_warning", overlayText: "REF BUMPED!", damage: 0, staminaDamage: 5, embarrassmentDamage: 9, specialGain: 8, movement: "wobble", line: (a, d) => `${shortName(a.name)} bumps the ref, apologizes to absolutely nobody, and the arena gasps in 16-bit.` },
+    { eventType: "victory_dance", overlayText: "TOO EARLY!", damage: 0, staminaDamage: 6, embarrassmentDamage: 13, specialGain: 9, movement: "celebrate", line: (a, d) => `${shortName(a.name)} celebrates too early and ${shortName(d.name)} notices the invitation.` },
+    { eventType: "wrong_corner", overlayText: "WRONG TOWEL!", damage: 0, staminaDamage: 4, embarrassmentDamage: 11, specialGain: 7, movement: "retreat", line: (a, d) => `${shortName(a.name)}'s corner throws the wrong towel. It may belong to catering.` },
+    { eventType: "ref_warning", overlayText: "ARGUES WITH REF!", damage: 0, staminaDamage: 4, embarrassmentDamage: 8, specialGain: 9, movement: "hold", line: (a, d) => `${shortName(a.name)} argues with the ref while ${shortName(d.name)} politely keeps fighting.` },
+    { eventType: "shoe_squeak", overlayText: "SWEAT SLIP!", damage: 2, staminaDamage: 7, embarrassmentDamage: 9, specialGain: 10, movement: "slip", line: (a, d) => `${shortName(a.name)} slips on sweat and tries to sell it as advanced footwork.` },
     { eventType: "stagger", overlayText: "WOBBLE!", damage: 10, staminaDamage: 12, embarrassmentDamage: 5, specialGain: 14, movement: "recoil", line: (a, d) => `${shortName(a.name)} staggers ${shortName(d.name)} so hard the crowd leans left.` },
   ];
 
   const events: BattleEvent[] = [];
-  let attacker: Side = Math.random() < 0.58 ? favorite : underdog;
+  let attacker: Side = Math.random() < (0.48 + traits(favorite).aggression / 250) ? favorite : underdog;
   let defender: Side = attacker === "fighter1" ? "fighter2" : "fighter1";
   let f1Special = 18;
   let f2Special = 18;
   let f1Health = 100;
   let f2Health = 100;
   let momentum: Side = favorite;
-  const eventCount = 12 + Math.floor(Math.random() * 6);
+  const eventCount = storyArc === "Fast Knockout" ? 9 + Math.floor(Math.random() * 4) : storyArc === "Legendary Battle" || storyArc === "Back-and-Forth War" ? 15 + Math.floor(Math.random() * 5) : 12 + Math.floor(Math.random() * 5);
 
   for (let index = 0; index < eventCount; index++) {
     const a = getFighter(attacker);
     const d = getFighter(defender);
     const closeRange = index > 3 || Math.abs(f1Health - f2Health) < 26;
     const hurtSide: Side | null = f1Health < 36 ? "fighter1" : f2Health < 36 ? "fighter2" : null;
+    const attackerTraits = traits(attacker);
+    const defenderTraits = traits(defender);
     const specialReady = attacker === "fighter1" ? f1Special >= 100 : f2Special >= 100;
     const pool = templates.filter((template) => {
       if (!closeRange && ["hook", "uppercut", "rope_pressure"].includes(template.eventType)) return false;
       if (hurtSide === attacker && ["panic_retreat", "comeback", "block", "slip"].includes(template.eventType)) return true;
       return true;
     });
+    const weightedPool = pool.flatMap((template) => {
+      let weight = 1;
+      if (["jab", "hook", "heavy_hit", "rope_pressure"].includes(template.eventType)) weight += Math.floor(attackerTraits.aggression / 28);
+      if (["panic_retreat", "slip", "block"].includes(template.eventType) && hurtSide === attacker) weight += Math.floor(attackerTraits.cowardice / 18);
+      if (["taunt", "victory_dance", "nickname_powerup", "outfit_bonus"].includes(template.eventType)) weight += Math.floor(attackerTraits.showmanship / 24);
+      if (["counter", "signature_fakeout", "block"].includes(template.eventType)) weight += Math.floor((safeNumber(getFighter(attacker).stats.intelligence) + attackerTraits.discipline) / 55);
+      if (["illegal_but_awesome", "ref_warning", "wrong_corner"].includes(template.eventType)) weight += Math.max(0, Math.floor((attackerTraits.dirtyFighting - attackerTraits.sportsmanship) / 20));
+      if (["emotional_damage", "mascot_confusion", "announcer_meltdown", "crowd_confused"].includes(template.eventType)) weight += Math.floor(attackerTraits.humor / 24);
+      if (["critical_hit", "uppercut", "special_move"].includes(template.eventType)) weight += Math.floor(attackerTraits.riskTaking / 32);
+      if (["heavy_hit", "illegal_but_awesome", "stagger"].includes(template.eventType) && hurtSide === attacker) weight += Math.floor(attackerTraits.temper / 26);
+      if (storyArc === "Comic Disaster" && ["crowd_confused", "wrong_corner", "bell_fakeout", "shoe_squeak", "mascot_confusion", "announcer_meltdown"].includes(template.eventType)) weight += 4;
+      if (storyArc === "Technical Chess Match" && ["counter", "block", "slip", "signature_fakeout"].includes(template.eventType)) weight += 3;
+      if (storyArc === "Underdog Comeback" && attacker === underdog && ["comeback", "counter", "critical_hit"].includes(template.eventType)) weight += 4;
+      if (storyArc === "Fast Knockout" && ["heavy_hit", "critical_hit", "uppercut", "special_move"].includes(template.eventType)) weight += 3;
+      if (storyArc === "Back-and-Forth War" && ["counter", "comeback", "stagger", "hook"].includes(template.eventType)) weight += 2;
+      return Array.from({ length: Math.max(1, Math.min(8, weight)) }, () => template);
+    });
     const specialTemplate: Template = { eventType: "special_move", overlayText: "CUSTOM SPECIAL!", damage: 24, staminaDamage: 16, embarrassmentDamage: 12, specialGain: -100, movement: "lunge", comboCount: 4, line: (specialA: Fighter, specialD: Fighter) => `${shortName(specialA.name)} cashes in a full meter for ${move(specialA)} and ${shortName(specialD.name)} files a formal complaint with gravity.` };
     const template = specialReady
       ? specialTemplate
-      : pick(pool);
+      : pick(weightedPool);
     const timeLeft = Math.max(7, 90 - index * Math.max(4, Math.floor(80 / eventCount)));
     const event: BattleEvent = {
       round: 1,
@@ -175,6 +291,10 @@ export function makeBattleEvents(fighter1: Fighter, fighter2: Fighter): BattleEv
       specialGain: template.specialGain,
       movement: template.movement,
       comboCount: template.comboCount,
+      momentumOwner: momentum,
+      storyArc,
+      crowdReaction: ["critical_hit", "special_move", "knockdown", "illegal_but_awesome", "crowd_confused", "comeback", "counter"].includes(template.eventType) ? crowdLineFor(template.eventType) : undefined,
+      taunt: template.eventType === "taunt" || (template.comboCount && attackerTraits.showmanship > 65) ? tauntFor(a, d, attackerTraits) : undefined,
       overlayText: template.overlayText,
       commentary: template.line(a, d),
     };
@@ -185,8 +305,8 @@ export function makeBattleEvents(fighter1: Fighter, fighter2: Fighter): BattleEv
     if (attacker === "fighter1") f1Special = Math.max(0, Math.min(100, f1Special + (event.specialGain ?? 12)));
     else f2Special = Math.max(0, Math.min(100, f2Special + (event.specialGain ?? 12)));
 
-    if (["counter", "comeback", "momentum_shift", "critical_hit", "special_move"].includes(event.eventType)) momentum = attacker;
-    const shouldSwitch = Math.random() < (momentum === attacker ? 0.36 : 0.58);
+    if (["counter", "comeback", "momentum_shift", "critical_hit", "special_move", "taunt", "block"].includes(event.eventType)) momentum = attacker;
+    const shouldSwitch = Math.random() < (momentum === attacker ? 0.3 + defenderTraits.temper / 400 : 0.5 + defenderTraits.aggression / 350);
     attacker = shouldSwitch ? defender : (Math.random() < 0.68 ? momentum : attacker);
     defender = attacker === "fighter1" ? "fighter2" : "fighter1";
   }
@@ -204,6 +324,9 @@ export function makeBattleEvents(fighter1: Fighter, fighter2: Fighter): BattleEv
     embarrassmentDamage: 12,
     movement: "fall",
     comboCount: 4,
+    momentumOwner: winner,
+    storyArc,
+    crowdReaction: crowdLineFor("knockdown"),
     overlayText: "KNOCKDOWN!",
     commentary: `${shortName(getFighter(winner).name)} sends ${shortName(getFighter(loser).name)} into a dramatic canvas meeting. The crowd has no idea if this is sport or theater.`,
   });
@@ -217,6 +340,9 @@ export function makeBattleEvents(fighter1: Fighter, fighter2: Fighter): BattleEv
     staminaDamage: 20,
     embarrassmentDamage: 18,
     movement: "celebrate",
+    momentumOwner: winner,
+    storyArc,
+    crowdReaction: "THE CROWD IS LOSING IT!",
     overlayText: "WINNER!",
     commentary: `${nickname(getFighter(winner))} finishes the bout with maximum nonsense and legally questionable charisma.`,
   });
@@ -319,7 +445,7 @@ function IntroCard({ fighter, side, compact }: { fighter: Fighter; side: "left" 
     <View style={[styles.introCard, { borderColor: color }]}>
       <Text style={[styles.playerTag, { backgroundColor: color }]}>{side === "left" ? "1P" : "2P"}</Text>
       <View style={styles.spritePortrait}>
-        <FighterSprite color={color} pose="block" mirrored={side === "right"} size={compact ? 62 : 76} trunksColor={side === "left" ? BLUE : WHITE} gloveColor={RED} />
+        <FighterSprite color={color} pose="block" mirrored={side === "right"} size={compact ? 62 : 76} trunksColor={side === "left" ? BLUE : WHITE} gloveColor={RED} idleBehavior={idleBehaviorFor(fighter)} />
       </View>
       <Text style={styles.introName} numberOfLines={1}>{shortName(fighter.name).toUpperCase()}</Text>
       <Text style={styles.introNick} numberOfLines={1}>"{fighter.nickname || "The Contender"}"</Text>
@@ -407,6 +533,43 @@ export function ComboOverlay({ text }: { text: string }) {
     >
       {text}
     </Animated.Text>
+  );
+}
+
+function CrowdReactionOverlay({ text }: { text: string }) {
+  const pop = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    pop.setValue(0);
+    Animated.sequence([
+      Animated.timing(pop, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.delay(760),
+      Animated.timing(pop, { toValue: 0, duration: 260, useNativeDriver: true }),
+    ]).start();
+  }, [pop, text]);
+
+  return (
+    <Animated.Text style={[styles.crowdReaction, { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}>
+      {text}
+    </Animated.Text>
+  );
+}
+
+function MomentumBanner({
+  fighter,
+  side,
+  storyArc,
+}: {
+  fighter: Fighter;
+  side: "fighter1" | "fighter2";
+  storyArc?: BattleEvent["storyArc"];
+}) {
+  const color = side === "fighter1" ? RED : BLUE;
+  return (
+    <View style={[styles.momentumBanner, { borderColor: color }]}>
+      <Text style={[styles.momentumText, { color }]}>MOMENTUM: {shortName(fighter.name).toUpperCase()}</Text>
+      <Text style={styles.storyText}>{storyArc || "Arcade Chaos"}</Text>
+    </View>
   );
 }
 
@@ -647,6 +810,11 @@ export function FightArenaScreen({
   return (
     <View style={styles.arenaScreen}>
       <TopHud fighter1={fighter1} fighter2={fighter2} f1Score={f1Score} f2Score={f2Score} status={paused ? "PAUSED" : autoMode ? "PRESS START" : "READY"} />
+      <MomentumBanner
+        fighter={event?.momentumOwner === "fighter2" ? fighter2 : fighter1}
+        side={event?.momentumOwner ?? "fighter1"}
+        storyArc={event?.storyArc}
+      />
       <Animated.View style={[styles.sceneWrap, { transform: [{ translateX: shake }] }]}>
         <BoxingScene
           fighter1={fighter1}
@@ -660,7 +828,12 @@ export function FightArenaScreen({
           ropeShake={ropeShake}
           ropeSide={ringInfo.ropeSide}
           impactKey={ringInfo.impactKey}
-          overlay={event ? <ComboOverlay text={event.overlayText} /> : null}
+          overlay={event ? (
+            <>
+              <ComboOverlay text={event.taunt || event.overlayText} />
+              {event.crowdReaction ? <CrowdReactionOverlay text={event.crowdReaction} /> : null}
+            </>
+          ) : null}
         />
       </Animated.View>
       <BottomHud
@@ -829,10 +1002,10 @@ function BoxingScene({
       </View>
       <View style={styles.fighters}>
         <Animated.View style={[styles.fighterSlot, { transform: [{ translateX: f1OffsetX ?? 0 }, { translateY: f1OffsetY ?? 0 }] }]}>
-          <FighterSprite color={RED} pose={f1Pose} size={spriteSize} trunksColor={BLUE} gloveColor={RED} skinTone={skinFor(fighter1, "left")} />
+          <FighterSprite color={RED} pose={f1Pose} size={spriteSize} trunksColor={BLUE} gloveColor={RED} skinTone={skinFor(fighter1, "left")} idleBehavior={fighter1 ? idleBehaviorFor(fighter1) : "bounce"} />
         </Animated.View>
         <Animated.View style={[styles.fighterSlot, f2Down && styles.knockedSlot, { transform: [{ translateX: f2OffsetX ?? 0 }, { translateY: f2OffsetY ?? 0 }] }]}>
-          <FighterSprite color={BLUE} pose={f2Pose} mirrored size={f2Down ? spriteSize * 1.12 : spriteSize} trunksColor={WHITE} gloveColor={RED} skinTone={skinFor(fighter2, "right")} bootColor="#e8e4d8" />
+          <FighterSprite color={BLUE} pose={f2Pose} mirrored size={f2Down ? spriteSize * 1.12 : spriteSize} trunksColor={WHITE} gloveColor={RED} skinTone={skinFor(fighter2, "right")} bootColor="#e8e4d8" idleBehavior={fighter2 ? idleBehaviorFor(fighter2) : "bounce"} />
         </Animated.View>
       </View>
       {impactKey ? <ImpactBurst key={impactKey} /> : null}
@@ -1030,6 +1203,33 @@ const styles = StyleSheet.create({
     textShadowRadius: 5,
     zIndex: 24,
   },
+  crowdReaction: {
+    position: "absolute",
+    right: 18,
+    top: "18%",
+    color: WHITE,
+    backgroundColor: "rgba(0,0,0,0.72)",
+    borderWidth: 2,
+    borderColor: GOLD,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    textAlign: "center",
+    zIndex: 25,
+  },
+  momentumBanner: {
+    minHeight: 30,
+    backgroundColor: BLACK,
+    borderBottomWidth: 2,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  momentumText: { flex: 1, fontFamily: "Inter_700Bold", fontSize: 11 },
+  storyText: { color: GOLD, fontFamily: "Inter_700Bold", fontSize: 10, textAlign: "right" },
   referee: { position: "absolute", right: "34%", bottom: "34%", alignItems: "center", zIndex: 20 },
   refHead: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#d29a73", borderWidth: 2, borderColor: OUTLINE },
   refBody: { width: 28, height: 46, backgroundColor: WHITE, borderWidth: 2, borderColor: OUTLINE },
