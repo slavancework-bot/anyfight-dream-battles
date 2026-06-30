@@ -81,29 +81,147 @@ export function formatFightTime(seconds: number) {
 }
 
 export function makeBattleEvents(fighter1: Fighter, fighter2: Fighter): BattleEvent[] {
-  const f1Edge = safeNumber(fighter1.stats.power) + safeNumber(fighter1.stats.speed) + safeNumber(fighter1.stats.intelligence);
-  const f2Edge = safeNumber(fighter2.stats.power) + safeNumber(fighter2.stats.speed) + safeNumber(fighter2.stats.intelligence);
-  const likelyWinner = f1Edge >= f2Edge ? "fighter1" : "fighter2";
-  const likelyLoser = likelyWinner === "fighter1" ? "fighter2" : "fighter1";
-  const getName = (side: "fighter1" | "fighter2") => (side === "fighter1" ? fighter1 : fighter2).name;
-  const getMove = (side: "fighter1" | "fighter2") => (side === "fighter1" ? fighter1 : fighter2).signatureMove || "signature punch";
+  type Side = "fighter1" | "fighter2";
+  type Template = {
+    eventType: BattleEvent["eventType"];
+    overlayText: string;
+    damage: number;
+    staminaDamage: number;
+    embarrassmentDamage?: number;
+    specialGain?: number;
+    movement?: BattleEvent["movement"];
+    comboCount?: number;
+    line: (attacker: Fighter, defender: Fighter) => string;
+  };
 
-  const script: Array<Omit<BattleEvent, "commentary"> & { commentary?: string }> = [
-    { round: 1, time: "01:27", attacker: likelyLoser, defender: likelyWinner, eventType: "jab", damage: 7, staminaDamage: 5, overlayText: "JAB!" },
-    { round: 1, time: "01:18", attacker: likelyWinner, defender: likelyLoser, eventType: "block", damage: 3, staminaDamage: 5, overlayText: "BLOCK!" },
-    { round: 1, time: "01:06", attacker: likelyWinner, defender: likelyLoser, eventType: "hook", damage: 14, staminaDamage: 8, comboCount: 2, overlayText: "HOOK!" },
-    { round: 1, time: "00:52", attacker: likelyLoser, defender: likelyWinner, eventType: "uppercut", damage: 12, staminaDamage: 11, overlayText: "UPPERCUT!" },
-    { round: 1, time: "00:37", attacker: likelyWinner, defender: likelyLoser, eventType: "special_move", damage: 18, staminaDamage: 14, comboCount: 3, overlayText: "3 HIT COMBO!" },
-    { round: 1, time: "00:18", attacker: likelyWinner, defender: likelyLoser, eventType: "knockdown", damage: 20, staminaDamage: 16, overlayText: "KNOCKDOWN!" },
-    { round: 1, time: "00:07", attacker: likelyWinner, defender: likelyLoser, eventType: "finishing_blow", damage: 28, staminaDamage: 20, overlayText: "WINNER!" },
+  const pick = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
+  const getFighter = (side: Side) => (side === "fighter1" ? fighter1 : fighter2);
+  const edge = (fighter: Fighter) => safeNumber(fighter.stats.power) + safeNumber(fighter.stats.speed) + safeNumber(fighter.stats.skill) + safeNumber(fighter.stats.intelligence);
+  const favorite: Side = edge(fighter1) >= edge(fighter2) ? "fighter1" : "fighter2";
+  const underdog: Side = favorite === "fighter1" ? "fighter2" : "fighter1";
+  const strength = (fighter: Fighter) => pick(fighter.strengths?.length ? fighter.strengths : ["mysterious confidence"]);
+  const weakness = (fighter: Fighter) => pick(fighter.weaknesses?.length ? fighter.weaknesses : ["dramatic overthinking"]);
+  const nickname = (fighter: Fighter) => fighter.nickname || shortName(fighter.name);
+  const move = (fighter: Fighter) => fighter.signatureMove || "Suspiciously Legal Haymaker";
+
+  const templates: Template[] = [
+    { eventType: "jab", overlayText: "PEPPER JAB!", damage: 7, staminaDamage: 5, specialGain: 12, movement: "advance", line: (a, d) => `${shortName(a.name)} flicks a jab and ${shortName(d.name)} blinks like the controller disconnected.` },
+    { eventType: "hook", overlayText: "BIG DAMAGE!", damage: 13, staminaDamage: 8, specialGain: 16, movement: "close", comboCount: 2, line: (a, d) => `${nickname(a)} whips a hook around the guard and the front row starts counting teeth.` },
+    { eventType: "uppercut", overlayText: "TO THE MOON!", damage: 15, staminaDamage: 10, specialGain: 18, movement: "inside", line: (a, d) => `${shortName(a.name)} ducks inside with an uppercut that makes ${shortName(d.name)} briefly reconsider gravity.` },
+    { eventType: "heavy_hit", overlayText: "BIG DAMAGE!", damage: 16, staminaDamage: 11, specialGain: 18, movement: "lunge", line: (a, d) => `${shortName(a.name)} lands a cartoon power shot powered by ${strength(a)}.` },
+    { eventType: "critical_hit", overlayText: "CRITICAL HIT!", damage: 21, staminaDamage: 13, embarrassmentDamage: 4, specialGain: 22, movement: "lunge", comboCount: 3, line: (a, d) => `${nickname(a)} finds the perfect angle and ${shortName(d.name)} gets reviewed by three imaginary judges.` },
+    { eventType: "counter", overlayText: "MOMENTUM SHIFT!", damage: 14, staminaDamage: 9, specialGain: 18, movement: "slip", line: (a, d) => `${shortName(a.name)} slips the shot and counters like they read ${shortName(d.name)}'s diary.` },
+    { eventType: "block", overlayText: "NOPE!", damage: 2, staminaDamage: 4, specialGain: 10, movement: "hold", line: (a, d) => `${shortName(a.name)} hides behind the gloves and lets ${shortName(d.name)} punch the concept of defense.` },
+    { eventType: "slip", overlayText: "WHIFF!", damage: 1, staminaDamage: 6, embarrassmentDamage: 6, specialGain: 12, movement: "slip", line: (a, d) => `${shortName(a.name)} slips sideways and ${shortName(d.name)} attacks the empty air with confidence.` },
+    { eventType: "taunt", overlayText: "CROWD CONFUSED!", damage: 0, staminaDamage: 3, embarrassmentDamage: 8, specialGain: 14, movement: "celebrate", line: (a, d) => `${nickname(a)} points at ${shortName(d.name)} and shouts something only the hot dog vendor understands.` },
+    { eventType: "crowd_chant", overlayText: "CROWD NOISE!", damage: 0, staminaDamage: 4, embarrassmentDamage: 3, specialGain: 16, movement: "bounce", line: (a, d) => `The crowd chants ${shortName(a.name)} so loudly that ${shortName(d.name)} starts checking if it is a home game.` },
+    { eventType: "ref_warning", overlayText: "REF SQUINTS!", damage: 0, staminaDamage: 3, embarrassmentDamage: 4, specialGain: 8, movement: "hold", line: (a, d) => `The ref warns ${shortName(a.name)} for excessive swagger and possibly inventing a new rule.` },
+    { eventType: "comeback", overlayText: "COMEBACK?!", damage: 12, staminaDamage: 7, embarrassmentDamage: 2, specialGain: 24, movement: "advance", line: (a, d) => `${shortName(a.name)} remembers ${strength(a)} and suddenly the scoreboard looks nervous.` },
+    { eventType: "panic_retreat", overlayText: "PANIC RETREAT!", damage: 0, staminaDamage: 8, embarrassmentDamage: 7, specialGain: 10, movement: "retreat", line: (a, d) => `${shortName(a.name)} moonwalks away from danger and calls it footwork.` },
+    { eventType: "rope_pressure", overlayText: "ON THE ROPES!", damage: 9, staminaDamage: 10, embarrassmentDamage: 3, specialGain: 14, movement: "cornered", line: (a, d) => `${shortName(a.name)} crowds ${shortName(d.name)} into the ropes like the ring owes them rent.` },
+    { eventType: "wardrobe_malfunction", overlayText: "GEAR DRAMA!", damage: 0, staminaDamage: 5, embarrassmentDamage: 12, specialGain: 12, movement: "wobble", line: (a, d) => `${shortName(a.name)}'s ${a.outfitChoice} outfit becomes a tactical distraction. Nobody is proud.` },
+    { eventType: "mascot_confusion", overlayText: "CROWD CONFUSED!", damage: 2, staminaDamage: 4, embarrassmentDamage: 9, specialGain: 10, movement: "wobble", line: (a, d) => `A fake league mascot points at ${shortName(d.name)} and ${shortName(a.name)} uses the confusion professionally.` },
+    { eventType: "wrong_corner", overlayText: "WRONG CORNER!", damage: 0, staminaDamage: 5, embarrassmentDamage: 10, specialGain: 8, movement: "retreat", line: (a, d) => `${shortName(a.name)} returns to ${shortName(d.name)}'s corner and asks why the towels feel hostile.` },
+    { eventType: "emotional_damage", overlayText: "EMOTIONAL DAMAGE!", damage: 5, staminaDamage: 4, embarrassmentDamage: 15, specialGain: 18, movement: "wobble", line: (a, d) => `${nickname(a)} weaponizes the nickname and ${shortName(d.name)} takes emotional splash damage.` },
+    { eventType: "illegal_but_awesome", overlayText: "ILLEGAL BUT AWESOME!", damage: 18, staminaDamage: 12, embarrassmentDamage: 8, specialGain: 6, movement: "lunge", line: (a, d) => `${shortName(a.name)} tries something the rulebook calls no and the crowd calls encore.` },
+    { eventType: "signature_fakeout", overlayText: "FAKEOUT!", damage: 8, staminaDamage: 6, embarrassmentDamage: 7, specialGain: 20, movement: "slip", line: (a, d) => `${shortName(a.name)} fakes ${move(a)} and ${shortName(d.name)} blocks a ghost.` },
+    { eventType: "nickname_powerup", overlayText: "NICKNAME POWER!", damage: 10, staminaDamage: 6, embarrassmentDamage: 5, specialGain: 25, movement: "bounce", line: (a, d) => `The announcer screams "${nickname(a)}" and somehow that counts as training.` },
+    { eventType: "weakness_exposed", overlayText: "WEAKNESS EXPOSED!", damage: 11, staminaDamage: 8, embarrassmentDamage: 10, specialGain: 18, movement: "advance", line: (a, d) => `${shortName(a.name)} spots ${weakness(d)} and attacks it with extremely questionable science.` },
+    { eventType: "strength_showcase", overlayText: "SHOWBOAT!", damage: 12, staminaDamage: 7, embarrassmentDamage: 4, specialGain: 18, movement: "celebrate", line: (a, d) => `${shortName(a.name)} turns ${strength(a)} into a highlight reel nobody asked for.` },
+    { eventType: "arch_nemesis_flashback", overlayText: "FLASHBACK!", damage: 9, staminaDamage: 7, embarrassmentDamage: 9, specialGain: 20, movement: "wobble", line: (a, d) => `${shortName(a.name)} thinks about ${a.archNemesis || "their arch nemesis"} and punches with unresolved subplot energy.` },
+    { eventType: "outfit_bonus", overlayText: "STYLE BONUS!", damage: 7, staminaDamage: 4, embarrassmentDamage: 6, specialGain: 18, movement: "celebrate", line: (a, d) => `${shortName(a.name)}'s ${a.outfitChoice} look gets a style bonus from two judges and one confused barber.` },
+    { eventType: "camera_flash", overlayText: "CAMERA FLASH!", damage: 4, staminaDamage: 3, embarrassmentDamage: 7, specialGain: 12, movement: "wobble", line: (a, d) => `Camera flashes pop and ${shortName(d.name)} accidentally poses during a punch exchange.` },
+    { eventType: "announcer_meltdown", overlayText: "ANNOUNCER MELTDOWN!", damage: 3, staminaDamage: 4, embarrassmentDamage: 8, specialGain: 10, movement: "bounce", line: (a, d) => `The announcer mispronounces both names, then gives ${shortName(a.name)} credit anyway.` },
+    { eventType: "bell_fakeout", overlayText: "BELL FAKEOUT!", damage: 6, staminaDamage: 5, embarrassmentDamage: 6, specialGain: 14, movement: "advance", line: (a, d) => `${shortName(d.name)} hears a bell that did not happen and ${shortName(a.name)} accepts the gift.` },
+    { eventType: "shoe_squeak", overlayText: "SQUEAK!", damage: 2, staminaDamage: 4, embarrassmentDamage: 5, specialGain: 9, movement: "slip", line: (a, d) => `${shortName(a.name)} squeaks across the canvas with elite sneaker-based intimidation.` },
+    { eventType: "stagger", overlayText: "WOBBLE!", damage: 10, staminaDamage: 12, embarrassmentDamage: 5, specialGain: 14, movement: "recoil", line: (a, d) => `${shortName(a.name)} staggers ${shortName(d.name)} so hard the crowd leans left.` },
   ];
 
-  return script.map((event) => ({
-    ...event,
-    commentary:
-      event.commentary ??
-      `${getName(event.attacker)} ${event.eventType === "special_move" ? `throws ${getMove(event.attacker)}` : "scores in the pocket"} and ${getName(event.defender)} has to survive the count.`,
-  }));
+  const events: BattleEvent[] = [];
+  let attacker: Side = Math.random() < 0.58 ? favorite : underdog;
+  let defender: Side = attacker === "fighter1" ? "fighter2" : "fighter1";
+  let f1Special = 18;
+  let f2Special = 18;
+  let f1Health = 100;
+  let f2Health = 100;
+  let momentum: Side = favorite;
+  const eventCount = 12 + Math.floor(Math.random() * 6);
+
+  for (let index = 0; index < eventCount; index++) {
+    const a = getFighter(attacker);
+    const d = getFighter(defender);
+    const closeRange = index > 3 || Math.abs(f1Health - f2Health) < 26;
+    const hurtSide: Side | null = f1Health < 36 ? "fighter1" : f2Health < 36 ? "fighter2" : null;
+    const specialReady = attacker === "fighter1" ? f1Special >= 100 : f2Special >= 100;
+    const pool = templates.filter((template) => {
+      if (!closeRange && ["hook", "uppercut", "rope_pressure"].includes(template.eventType)) return false;
+      if (hurtSide === attacker && ["panic_retreat", "comeback", "block", "slip"].includes(template.eventType)) return true;
+      return true;
+    });
+    const specialTemplate: Template = { eventType: "special_move", overlayText: "CUSTOM SPECIAL!", damage: 24, staminaDamage: 16, embarrassmentDamage: 12, specialGain: -100, movement: "lunge", comboCount: 4, line: (specialA: Fighter, specialD: Fighter) => `${shortName(specialA.name)} cashes in a full meter for ${move(specialA)} and ${shortName(specialD.name)} files a formal complaint with gravity.` };
+    const template = specialReady
+      ? specialTemplate
+      : pick(pool);
+    const timeLeft = Math.max(7, 90 - index * Math.max(4, Math.floor(80 / eventCount)));
+    const event: BattleEvent = {
+      round: 1,
+      time: `0${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, "0")}`,
+      attacker,
+      defender,
+      eventType: template.eventType,
+      damage: template.damage,
+      staminaDamage: template.staminaDamage,
+      embarrassmentDamage: template.embarrassmentDamage,
+      specialGain: template.specialGain,
+      movement: template.movement,
+      comboCount: template.comboCount,
+      overlayText: template.overlayText,
+      commentary: template.line(a, d),
+    };
+    events.push(event);
+
+    if (defender === "fighter1") f1Health = Math.max(0, f1Health - event.damage);
+    else f2Health = Math.max(0, f2Health - event.damage);
+    if (attacker === "fighter1") f1Special = Math.max(0, Math.min(100, f1Special + (event.specialGain ?? 12)));
+    else f2Special = Math.max(0, Math.min(100, f2Special + (event.specialGain ?? 12)));
+
+    if (["counter", "comeback", "momentum_shift", "critical_hit", "special_move"].includes(event.eventType)) momentum = attacker;
+    const shouldSwitch = Math.random() < (momentum === attacker ? 0.36 : 0.58);
+    attacker = shouldSwitch ? defender : (Math.random() < 0.68 ? momentum : attacker);
+    defender = attacker === "fighter1" ? "fighter2" : "fighter1";
+  }
+
+  const winner: Side = f1Health === f2Health ? favorite : f1Health > f2Health ? "fighter1" : "fighter2";
+  const loser: Side = winner === "fighter1" ? "fighter2" : "fighter1";
+  events.push({
+    round: 1,
+    time: "00:05",
+    attacker: winner,
+    defender: loser,
+    eventType: "knockdown",
+    damage: 24,
+    staminaDamage: 16,
+    embarrassmentDamage: 12,
+    movement: "fall",
+    comboCount: 4,
+    overlayText: "KNOCKDOWN!",
+    commentary: `${shortName(getFighter(winner).name)} sends ${shortName(getFighter(loser).name)} into a dramatic canvas meeting. The crowd has no idea if this is sport or theater.`,
+  });
+  events.push({
+    round: 1,
+    time: "00:01",
+    attacker: winner,
+    defender: loser,
+    eventType: "finishing_blow",
+    damage: 100,
+    staminaDamage: 20,
+    embarrassmentDamage: 18,
+    movement: "celebrate",
+    overlayText: "WINNER!",
+    commentary: `${nickname(getFighter(winner))} finishes the bout with maximum nonsense and legally questionable charisma.`,
+  });
+
+  return events;
 }
 
 export function ArcadeFrame({ children, style }: { children: React.ReactNode; style?: object }) {
@@ -399,6 +517,8 @@ export function FightArenaScreen({
   f2Stamina,
   f1Special,
   f2Special,
+  f1Embarrassment,
+  f2Embarrassment,
   round,
   time,
   paused,
@@ -418,6 +538,8 @@ export function FightArenaScreen({
   f2Stamina: number;
   f1Special: number;
   f2Special: number;
+  f1Embarrassment: number;
+  f2Embarrassment: number;
   round: number;
   time: string;
   paused: boolean;
@@ -455,6 +577,8 @@ export function FightArenaScreen({
         fighter2={fighter2}
         f1Power={Math.max(f1Stamina, f1Special)}
         f2Power={Math.max(f2Stamina, f2Special)}
+        f1Embarrassment={f1Embarrassment}
+        f2Embarrassment={f2Embarrassment}
         round={round}
         time={time}
       />
@@ -475,14 +599,16 @@ function poseFor(side: "fighter1" | "fighter2", event: BattleEvent | null): Figh
   if (!event) return "idle";
   if (event.defender === side) {
     if (event.eventType === "knockdown" || event.eventType === "finishing_blow") return "knockdown";
-    if (event.eventType === "stagger" || event.eventType === "critical_hit") return "stagger";
-    if (event.eventType === "block") return "block";
+    if (["stagger", "critical_hit", "emotional_damage", "weakness_exposed", "wardrobe_malfunction", "wrong_corner", "crowd_confused"].includes(event.eventType)) return "stagger";
+    if (event.eventType === "block" || event.eventType === "ref_warning") return "block";
     return "hit";
   }
   if (event.attacker !== side) return "idle";
-  if (event.eventType === "hook" || event.eventType === "critical_hit") return "hook";
-  if (event.eventType === "uppercut" || event.eventType === "special_move" || event.eventType === "finishing_blow") return "uppercut";
-  if (event.eventType === "counter") return "stepForward";
+  if (["hook", "critical_hit", "heavy_hit", "illegal_but_awesome", "strength_showcase"].includes(event.eventType)) return "hook";
+  if (["uppercut", "special_move", "finishing_blow", "nickname_powerup", "arch_nemesis_flashback"].includes(event.eventType)) return "uppercut";
+  if (["counter", "comeback", "momentum_shift", "rope_pressure"].includes(event.eventType)) return "stepForward";
+  if (["slip", "panic_retreat", "shoe_squeak"].includes(event.eventType)) return "stepBack";
+  if (["taunt", "crowd_chant", "outfit_bonus", "announcer_meltdown", "camera_flash", "victory_dance"].includes(event.eventType)) return "winner";
   return "jab";
 }
 
@@ -512,17 +638,35 @@ function TopHud({ fighter1, fighter2, f1Score, f2Score, status }: { fighter1: Fi
   );
 }
 
-function BottomHud({ fighter1, fighter2, f1Power, f2Power, round, time }: { fighter1: Fighter; fighter2: Fighter; f1Power: number; f2Power: number; round: number; time: string }) {
+function BottomHud({
+  fighter1,
+  fighter2,
+  f1Power,
+  f2Power,
+  f1Embarrassment,
+  f2Embarrassment,
+  round,
+  time,
+}: {
+  fighter1: Fighter;
+  fighter2: Fighter;
+  f1Power: number;
+  f2Power: number;
+  f1Embarrassment: number;
+  f2Embarrassment: number;
+  round: number;
+  time: string;
+}) {
   return (
     <View style={styles.bottomHud}>
-      <PowerPanel side="left" fighter={fighter1} power={f1Power} />
+      <PowerPanel side="left" fighter={fighter1} power={f1Power} embarrassment={f1Embarrassment} />
       <RoundTimerBadge round={round} time={time} />
-      <PowerPanel side="right" fighter={fighter2} power={f2Power} />
+      <PowerPanel side="right" fighter={fighter2} power={f2Power} embarrassment={f2Embarrassment} />
     </View>
   );
 }
 
-function PowerPanel({ side, fighter, power }: { side: "left" | "right"; fighter: Fighter; power: number }) {
+function PowerPanel({ side, fighter, power, embarrassment }: { side: "left" | "right"; fighter: Fighter; power: number; embarrassment: number }) {
   const color = side === "left" ? RED : BLUE;
   return (
     <View style={[styles.powerPanel, side === "right" && { alignItems: "flex-end" }]}>
@@ -536,6 +680,8 @@ function PowerPanel({ side, fighter, power }: { side: "left" | "right"; fighter:
         <Text style={styles.powerText}>POWER</Text>
         <MeterBar value={power} color={color} height={11} reverse={side === "right"} />
         <Text style={styles.powerPercent}>{Math.round(power)}%</Text>
+        <Text style={styles.embarrassText}>SHAME {Math.round(embarrassment)}%</Text>
+        <MeterBar value={embarrassment} color="#d744d8" height={7} reverse={side === "right"} />
       </View>
     </View>
   );
@@ -802,6 +948,7 @@ const styles = StyleSheet.create({
   powerMeterRow: { gap: 3 },
   powerText: { color: GOLD, fontFamily: "Inter_700Bold", fontSize: 11 },
   powerPercent: { color: GOLD, fontFamily: "Inter_700Bold", fontSize: 16 },
+  embarrassText: { color: "#d744d8", fontFamily: "Inter_700Bold", fontSize: 9, marginTop: 1 },
   meterTrack: { width: "100%", backgroundColor: "#161616", borderWidth: 2, borderColor: WHITE, overflow: "hidden" },
   meterFill: { height: "100%" },
   timerBox: { width: 72, minHeight: 68, borderWidth: 2, borderColor: WHITE, backgroundColor: "#060606", alignItems: "center", justifyContent: "center", paddingVertical: 3 },

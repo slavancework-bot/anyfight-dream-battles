@@ -28,6 +28,8 @@ interface FightMeters {
   f2Stamina: number;
   f1Special: number;
   f2Special: number;
+  f1Embarrassment: number;
+  f2Embarrassment: number;
 }
 
 const INITIAL_METERS: FightMeters = {
@@ -37,6 +39,8 @@ const INITIAL_METERS: FightMeters = {
   f2Stamina: 100,
   f1Special: 18,
   f2Special: 18,
+  f1Embarrassment: 0,
+  f2Embarrassment: 0,
 };
 
 function winnerSideFromMeters(meters: FightMeters, fallback: "fighter1" | "fighter2") {
@@ -53,12 +57,14 @@ function applyEvent(meters: FightMeters, event: BattleEvent): FightMeters {
   if (event.defender === "fighter1") {
     next.f1Health = Math.max(0, next.f1Health - event.damage);
     next.f1Stamina = Math.max(0, next.f1Stamina - event.staminaDamage);
-    next.f2Special = Math.min(100, next.f2Special + Math.max(10, event.damage));
+    next.f1Embarrassment = Math.min(100, next.f1Embarrassment + (event.embarrassmentDamage ?? 0));
+    next.f2Special = Math.max(0, Math.min(100, next.f2Special + (event.specialGain ?? Math.max(10, event.damage))));
     next.f2Stamina = Math.max(12, next.f2Stamina - Math.round(event.staminaDamage * 0.3));
   } else {
     next.f2Health = Math.max(0, next.f2Health - event.damage);
     next.f2Stamina = Math.max(0, next.f2Stamina - event.staminaDamage);
-    next.f1Special = Math.min(100, next.f1Special + Math.max(10, event.damage));
+    next.f2Embarrassment = Math.min(100, next.f2Embarrassment + (event.embarrassmentDamage ?? 0));
+    next.f1Special = Math.max(0, Math.min(100, next.f1Special + (event.specialGain ?? Math.max(10, event.damage))));
     next.f1Stamina = Math.max(12, next.f1Stamina - Math.round(event.staminaDamage * 0.3));
   }
 
@@ -285,6 +291,8 @@ export default function BattleScreen() {
         f2Stamina={meters.f2Stamina}
         f1Special={meters.f1Special}
         f2Special={meters.f2Special}
+        f1Embarrassment={meters.f1Embarrassment}
+        f2Embarrassment={meters.f2Embarrassment}
         round={currentEvent?.round ?? 1}
         time={currentEvent?.time ?? formatFightTime(elapsed)}
         paused={paused}

@@ -101,7 +101,32 @@ export type BattleEventType =
   | "stagger"
   | "knockdown"
   | "ref_count"
-  | "finishing_blow";
+  | "finishing_blow"
+  | "taunt"
+  | "slip"
+  | "crowd_chant"
+  | "ref_warning"
+  | "comeback"
+  | "panic_retreat"
+  | "rope_pressure"
+  | "wardrobe_malfunction"
+  | "mascot_confusion"
+  | "wrong_corner"
+  | "emotional_damage"
+  | "illegal_but_awesome"
+  | "crowd_confused"
+  | "momentum_shift"
+  | "signature_fakeout"
+  | "nickname_powerup"
+  | "weakness_exposed"
+  | "strength_showcase"
+  | "arch_nemesis_flashback"
+  | "outfit_bonus"
+  | "camera_flash"
+  | "announcer_meltdown"
+  | "bell_fakeout"
+  | "shoe_squeak"
+  | "victory_dance";
 
 export interface BattleEvent {
   round: number;
@@ -111,6 +136,9 @@ export interface BattleEvent {
   eventType: BattleEventType;
   damage: number;
   staminaDamage: number;
+  embarrassmentDamage?: number;
+  specialGain?: number;
+  movement?: "advance" | "close" | "inside" | "hold" | "recoil" | "fall" | "lunge" | "slip" | "retreat" | "celebrate" | "wobble" | "bounce" | "cornered";
   comboCount?: number;
   commentary: string;
   overlayText: string;
