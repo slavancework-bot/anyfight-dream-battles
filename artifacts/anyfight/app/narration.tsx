@@ -11,6 +11,15 @@ import { useTTS } from "@/hooks/useTTS";
 import { Ionicons } from "@expo/vector-icons";
 import { FighterPortrait } from "@/components/FighterPortrait";
 
+const ARCADE = {
+  black: "#030303",
+  panel: "#080808",
+  gold: "#f2b92f",
+  red: "#e52e21",
+  white: "#f7efe0",
+  border: "#4b4435",
+};
+
 export default function NarrationScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -88,12 +97,10 @@ export default function NarrationScreen() {
     <View style={[styles.container, { backgroundColor: "#000" }]}>
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: "#fff", opacity: flashAnim }]} />
 
-      <LinearGradient
-        colors={["#000", "#080810", "#0a0014"]}
-        style={StyleSheet.absoluteFill}
-      />
+      <LinearGradient colors={["#050505", "#0b0b0d", "#050505"]} style={StyleSheet.absoluteFill} />
+      <View style={styles.scanlines} pointerEvents="none" />
 
-      <View style={[styles.glowLine, { top: insets.top + (Platform.OS === "web" ? 67 : 16), backgroundColor: colors.neonRed }]} />
+      <View style={[styles.glowLine, { top: insets.top + (Platform.OS === "web" ? 67 : 16) }]} />
 
       {/* Speaker icon — top-right corner */}
       <Pressable
@@ -115,7 +122,7 @@ export default function NarrationScreen() {
             <FighterPortrait fighter={fighter1} size={80} nameColor={colors.neonBlue} />
             <Text style={[styles.fighterName, { color: colors.neonBlue }]} numberOfLines={1}>{fighter1.name.toUpperCase()}</Text>
           </View>
-          <Text style={[styles.vsLabel, { color: colors.accent }]}>VS</Text>
+          <Text style={styles.vsLabel}>VS</Text>
           <View style={styles.fighterPortraitCol}>
             <FighterPortrait fighter={fighter2} size={80} nameColor={colors.neonPurple} />
             <Text style={[styles.fighterName, { color: colors.neonPurple }]} numberOfLines={1}>{fighter2.name.toUpperCase()}</Text>
@@ -140,7 +147,7 @@ export default function NarrationScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.beginGradient}
             >
-              <Text style={styles.beginText}>⚡ BEGIN FIGHT ⚡</Text>
+              <Text style={styles.beginText}>PRESS START</Text>
             </LinearGradient>
           </Pressable>
         </Animated.View>
@@ -172,7 +179,7 @@ function NarrationLine({ text, visible, delay, colors }: { text: string; visible
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },
-  glowLine: { position: "absolute", left: 0, right: 0, height: 2, opacity: 0.8 },
+  glowLine: { position: "absolute", left: 0, right: 0, height: 2, opacity: 0.9, backgroundColor: ARCADE.gold },
   fightersRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -191,6 +198,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   vsLabel: {
+    color: ARCADE.gold,
     fontSize: 22,
     fontFamily: "Inter_700Bold",
     letterSpacing: 3,
@@ -198,6 +206,11 @@ const styles = StyleSheet.create({
   },
   narrationArea: { gap: 16 },
   narrationLine: {
+    backgroundColor: ARCADE.panel,
+    borderWidth: 2,
+    borderColor: ARCADE.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 15,
     lineHeight: 22,
     fontFamily: "Inter_500Medium",
@@ -217,7 +230,8 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 24,
   },
-  beginBtn: { borderRadius: 12, overflow: "hidden" },
+  beginBtn: { borderRadius: 0, overflow: "hidden", borderWidth: 2, borderColor: ARCADE.gold },
   beginGradient: { paddingVertical: 18, alignItems: "center" },
-  beginText: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 3 },
+  beginText: { fontSize: 18, fontFamily: "Inter_700Bold", color: ARCADE.white, letterSpacing: 3 },
+  scanlines: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,255,255,0.035)", opacity: 0.35 },
 });
