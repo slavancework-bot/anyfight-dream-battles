@@ -242,7 +242,7 @@ export default function BattleScreen() {
   }
 
   if (phase === "roundIntro") {
-    return <RoundIntroScreen round={1} onSkip={enterArena} />;
+    return <RoundIntroScreen round={1} onSkip={enterArena} fighter1={fighter1} fighter2={fighter2} />;
   }
 
   if (phase === "ko" && winnerSide) {

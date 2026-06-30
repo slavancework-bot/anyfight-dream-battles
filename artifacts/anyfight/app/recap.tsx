@@ -88,6 +88,7 @@ export default function RecapScreen() {
   return (
     <WinnerScreen
       winner={battleWinner}
+      loser={battleLoser}
       stats={winnerStats}
       onRematch={handleRematch}
       onFightAgain={handleFightAgain}
