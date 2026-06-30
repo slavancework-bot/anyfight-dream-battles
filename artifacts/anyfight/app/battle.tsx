@@ -17,7 +17,7 @@ import { useStorage } from "@/context/StorageContext";
 import { useBattleSounds } from "@/hooks/useBattleSounds";
 import { useColors } from "@/hooks/useColors";
 import { useTTS } from "@/hooks/useTTS";
-import type { BattleEvent } from "@/types";
+import type { BattleEvent, FightStats } from "@/types";
 
 type FightPhase = "card" | "roundIntro" | "arena" | "ko";
 
@@ -70,6 +70,23 @@ function applyEvent(meters: FightMeters, event: BattleEvent): FightMeters {
   return next;
 }
 
+function buildFightStats(events: BattleEvent[], winnerSide: "fighter1" | "fighter2", finalMeters: FightMeters): FightStats {
+  const winnerDamage = events
+    .filter((event) => event.attacker === winnerSide)
+    .reduce((total, event) => total + event.damage, 0);
+  return {
+    knockdowns: events.filter((event) => event.eventType === "knockdown" || event.eventType === "finishing_blow").length,
+    maxCombo: Math.max(1, ...events.map((event) => event.comboCount ?? 1)),
+    damageDealtPercent: Math.max(0, Math.min(100, Math.round(winnerDamage))),
+    specialMoves: events.filter((event) => event.attacker === winnerSide && (event.eventType === "special_move" || event.eventType === "finishing_blow")).length,
+    punchesLanded: events.filter((event) => event.attacker === winnerSide && event.eventType !== "block" && event.eventType !== "ref_count").length,
+    finalHealth: {
+      fighter1: Math.max(0, Math.round(finalMeters.f1Health)),
+      fighter2: Math.max(0, Math.round(finalMeters.f2Health)),
+    },
+  };
+}
+
 export default function BattleScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -90,6 +107,7 @@ export default function BattleScreen() {
   const [winnerSide, setWinnerSide] = useState<"fighter1" | "fighter2" | null>(null);
   const endedRef = useRef(false);
   const startTimeRef = useRef(Date.now());
+  const eventLogRef = useRef<BattleEvent[]>([]);
 
   const events = useMemo(() => {
     if (!fighter1 || !fighter2) return [];
@@ -116,6 +134,7 @@ export default function BattleScreen() {
     const winner = side === "fighter1" ? fighter1 : fighter2;
     const loser = side === "fighter1" ? fighter2 : fighter1;
     const duration = Math.max(12, Math.round((Date.now() - startTimeRef.current) / 1000));
+    const fightStats = buildFightStats(eventLogRef.current, side, finalMeters);
 
     setMeters(finalMeters);
     setWinnerSide(side);
@@ -132,7 +151,7 @@ export default function BattleScreen() {
       });
       if (!res.ok) throw new Error("recap failed");
       const recap = await res.json();
-      setRecap(recap, winner, loser, duration, 1);
+      setRecap(recap, winner, loser, duration, 1, fightStats);
     } catch {
       setRecap({
         winner: winner.name,
@@ -142,7 +161,7 @@ export default function BattleScreen() {
         crowdReaction: "The crowd erupts as the final bell disappears under the roar.",
         memorableMoment: `${winner.name} closed the show with ${winner.signatureMove || "a decisive strike"}.`,
         fullRecap: `${winner.name} defeats ${loser.name} after a wild arcade brawl packed with counters, knockdowns, and a finishing blow.`,
-      }, winner, loser, duration, 1);
+      }, winner, loser, duration, 1, fightStats);
     }
 
     setTimeout(() => router.replace("/recap"), 1800);
@@ -161,6 +180,7 @@ export default function BattleScreen() {
 
     setEventIndex(index);
     setCurrentEvent(event);
+    eventLogRef.current = [...eventLogRef.current.filter((logged) => logged.time !== event.time || logged.eventType !== event.eventType), event];
     setMeters((previous) => {
       const next = applyEvent(previous, event);
       if (event.eventType === "finishing_blow" || next.f1Health <= 0 || next.f2Health <= 0) {
@@ -190,6 +210,7 @@ export default function BattleScreen() {
     setEventIndex(-1);
     setCurrentEvent(null);
     setWinnerSide(null);
+    eventLogRef.current = [];
     setPhase("roundIntro");
     playSound("roundStart");
     announce("Round one. Fight!");
@@ -203,8 +224,9 @@ export default function BattleScreen() {
   const skipToFinish = useCallback(() => {
     if (!fighter1 || !fighter2 || endedRef.current) return;
     const side = predictedWinner;
+    eventLogRef.current = events;
     finishFight(side, side === "fighter1" ? { ...meters, f2Health: 0 } : { ...meters, f1Health: 0 });
-  }, [fighter1, fighter2, finishFight, meters, predictedWinner]);
+  }, [events, fighter1, fighter2, finishFight, meters, predictedWinner]);
 
   useEffect(() => {
     if (phase !== "roundIntro") return;

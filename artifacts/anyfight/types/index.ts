@@ -77,6 +77,18 @@ export interface BattleRecap {
   fullRecap: string;
 }
 
+export interface FightStats {
+  knockdowns: number;
+  maxCombo: number;
+  damageDealtPercent: number;
+  specialMoves: number;
+  punchesLanded: number;
+  finalHealth: {
+    fighter1: number;
+    fighter2: number;
+  };
+}
+
 export type BattleEventType =
   | "jab"
   | "hook"

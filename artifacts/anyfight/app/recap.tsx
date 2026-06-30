@@ -16,6 +16,7 @@ export default function RecapScreen() {
     analysis,
     fightDurationSeconds,
     rounds,
+    fightStats,
     resetBattle,
   } = useBattle();
   const { addBattleRecord, saveFighter, saveMatchup } = useStorage();
@@ -49,12 +50,12 @@ export default function RecapScreen() {
     return [
       { label: "TIME", value: recap.fightTime },
       { label: "ROUND", value: String(rounds || 1) },
-      { label: "KNOCKDOWNS", value: "2" },
-      { label: "MAX COMBO", value: "4" },
-      { label: "DAMAGE DEALT", value: "78%" },
-      { label: "SPECIAL MOVES", value: "2" },
+      { label: "KNOCKDOWNS", value: String(fightStats?.knockdowns ?? 0) },
+      { label: "MAX COMBO", value: String(fightStats?.maxCombo ?? 1) },
+      { label: "DAMAGE DEALT", value: `${fightStats?.damageDealtPercent ?? 0}%` },
+      { label: "SPECIAL MOVES", value: String(fightStats?.specialMoves ?? 0) },
     ];
-  }, [recap, rounds]);
+  }, [fightStats, recap, rounds]);
 
   if (!recap || !battleWinner || !battleLoser) {
     return null;
