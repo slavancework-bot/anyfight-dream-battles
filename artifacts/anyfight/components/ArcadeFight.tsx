@@ -551,10 +551,35 @@ export function FightArenaScreen({
   onAuto: () => void;
 }) {
   const shake = useRef(new Animated.Value(0)).current;
+  const f1X = useRef(new Animated.Value(-8)).current;
+  const f2X = useRef(new Animated.Value(8)).current;
+  const f1Y = useRef(new Animated.Value(0)).current;
+  const f2Y = useRef(new Animated.Value(0)).current;
+  const ropeShake = useRef(new Animated.Value(0)).current;
+  const f1PositionRef = useRef({ x: -8, y: 0 });
+  const f2PositionRef = useRef({ x: 8, y: 0 });
+  const [ringInfo, setRingInfo] = useState({ distanceBetweenFighters: 46, ropeSide: null as "left" | "right" | null, impactKey: 0 });
   const f1Pose = poseFor("fighter1", event);
   const f2Pose = poseFor("fighter2", event);
   const f1Score = scoreFor(fighter1, f2Health);
   const f2Score = scoreFor(fighter2, f1Health);
+  const ringBoundaryLeft = -34;
+  const ringBoundaryRight = 34;
+
+  const moveFighter = (side: "fighter1" | "fighter2", nextX: number, nextY = 0, duration = 220) => {
+    const clampedX = Math.max(ringBoundaryLeft, Math.min(ringBoundaryRight, nextX));
+    const targetRef = side === "fighter1" ? f1PositionRef : f2PositionRef;
+    const xAnim = side === "fighter1" ? f1X : f2X;
+    const yAnim = side === "fighter1" ? f1Y : f2Y;
+    targetRef.current = { x: clampedX, y: nextY };
+    Animated.parallel([
+      Animated.spring(xAnim, { toValue: clampedX, useNativeDriver: true, tension: 130, friction: 9 }),
+      Animated.sequence([
+        Animated.timing(yAnim, { toValue: nextY, duration: Math.max(80, duration * 0.45), useNativeDriver: true }),
+        Animated.spring(yAnim, { toValue: 0, useNativeDriver: true, tension: 160, friction: 8 }),
+      ]),
+    ]).start();
+  };
 
   useEffect(() => {
     if (!event) return;
@@ -564,13 +589,79 @@ export function FightArenaScreen({
       Animated.timing(shake, { toValue: -amount, duration: 34, useNativeDriver: true }),
       Animated.timing(shake, { toValue: 0, duration: 50, useNativeDriver: true }),
     ]).start();
+
+    const attacker = event.attacker;
+    const defender = event.defender;
+    const attackerRef = attacker === "fighter1" ? f1PositionRef : f2PositionRef;
+    const defenderRef = defender === "fighter1" ? f1PositionRef : f2PositionRef;
+    const dir = attacker === "fighter1" ? 1 : -1;
+    const closeStep = event.movement === "inside" ? 12 : event.movement === "close" ? 10 : event.movement === "lunge" ? 16 : 6;
+    const recoil = event.eventType === "knockdown" || event.eventType === "finishing_blow" ? 24 : event.eventType === "critical_hit" ? 14 : 9;
+
+    switch (event.movement) {
+      case "advance":
+      case "close":
+      case "inside":
+      case "lunge":
+        moveFighter(attacker, attackerRef.current.x + dir * closeStep, event.movement === "lunge" ? -8 : -3);
+        moveFighter(defender, defenderRef.current.x + dir * Math.max(2, closeStep * 0.25), 0);
+        break;
+      case "recoil":
+      case "wobble":
+        moveFighter(defender, defenderRef.current.x + dir * recoil, event.movement === "wobble" ? -5 : 0);
+        break;
+      case "fall":
+        moveFighter(defender, defenderRef.current.x + dir * 24, 18, 340);
+        break;
+      case "retreat":
+        moveFighter(attacker, attackerRef.current.x - dir * 14, 0);
+        break;
+      case "slip":
+        moveFighter(attacker, attackerRef.current.x - dir * 7, -6);
+        moveFighter(defender, defenderRef.current.x + dir * 5, 0);
+        break;
+      case "cornered":
+        moveFighter(defender, defender === "fighter1" ? ringBoundaryLeft : ringBoundaryRight, 0);
+        Animated.sequence([
+          Animated.timing(ropeShake, { toValue: defender === "fighter1" ? -7 : 7, duration: 60, useNativeDriver: true }),
+          Animated.timing(ropeShake, { toValue: 0, duration: 160, useNativeDriver: true }),
+        ]).start();
+        break;
+      case "celebrate":
+      case "bounce":
+        moveFighter(attacker, attackerRef.current.x, -9);
+        break;
+      case "hold":
+      default:
+        moveFighter(attacker, attackerRef.current.x + dir * 2, -2);
+        break;
+    }
+
+    const f1Current = f1PositionRef.current.x;
+    const f2Current = f2PositionRef.current.x;
+    const distance = Math.max(12, Math.round(58 + f2Current - f1Current));
+    const ropeSide = f1Current <= ringBoundaryLeft + 3 ? "left" : f2Current >= ringBoundaryRight - 3 ? "right" : null;
+    setRingInfo((previous) => ({ distanceBetweenFighters: distance, ropeSide, impactKey: previous.impactKey + 1 }));
   }, [event, shake]);
 
   return (
     <View style={styles.arenaScreen}>
       <TopHud fighter1={fighter1} fighter2={fighter2} f1Score={f1Score} f2Score={f2Score} status={paused ? "PAUSED" : autoMode ? "PRESS START" : "READY"} />
       <Animated.View style={[styles.sceneWrap, { transform: [{ translateX: shake }] }]}>
-        <BoxingScene fighter1={fighter1} fighter2={fighter2} f1Pose={f1Pose} f2Pose={f2Pose} overlay={event ? <ComboOverlay text={event.overlayText} /> : null} />
+        <BoxingScene
+          fighter1={fighter1}
+          fighter2={fighter2}
+          f1Pose={f1Pose}
+          f2Pose={f2Pose}
+          f1OffsetX={f1X}
+          f2OffsetX={f2X}
+          f1OffsetY={f1Y}
+          f2OffsetY={f2Y}
+          ropeShake={ropeShake}
+          ropeSide={ringInfo.ropeSide}
+          impactKey={ringInfo.impactKey}
+          overlay={event ? <ComboOverlay text={event.overlayText} /> : null}
+        />
       </Animated.View>
       <BottomHud
         fighter1={fighter1}
@@ -583,7 +674,7 @@ export function FightArenaScreen({
         time={time}
       />
       <View style={styles.bottomTools}>
-        <CommentaryTicker text={event?.commentary ?? "The bell rings as the boxers bounce under the arena lights."} />
+        <CommentaryTicker text={event?.commentary ?? `The bell rings as the boxers bounce at range ${ringInfo.distanceBetweenFighters}.`} />
         <View style={styles.controls}>
           <ArcadeButton compact label={paused ? "RESUME" : "PAUSE"} icon={paused ? "play" : "pause"} onPress={onPause} />
           <ArcadeButton compact label={fastForward ? "2X SPEED" : "1X SPEED"} icon="speedometer" onPress={onSpeed} />
@@ -692,12 +783,26 @@ function BoxingScene({
   fighter2,
   f1Pose,
   f2Pose,
+  f1OffsetX,
+  f2OffsetX,
+  f1OffsetY,
+  f2OffsetY,
+  ropeShake,
+  ropeSide,
+  impactKey,
   overlay,
 }: {
   fighter1?: Fighter;
   fighter2?: Fighter;
   f1Pose: FighterPose;
   f2Pose: FighterPose;
+  f1OffsetX?: Animated.Value;
+  f2OffsetX?: Animated.Value;
+  f1OffsetY?: Animated.Value;
+  f2OffsetY?: Animated.Value;
+  ropeShake?: Animated.Value;
+  ropeSide?: "left" | "right" | null;
+  impactKey?: number;
   overlay?: React.ReactNode;
 }) {
   const { width, height } = useWindowDimensions();
@@ -710,11 +815,11 @@ function BoxingScene({
       <PixelBackdrop />
       <Crowd />
       <Spotlights />
-      <View style={styles.ropes}>
+      <Animated.View style={[styles.ropes, ropeShake ? { transform: [{ translateX: ropeShake }] } : null]}>
         <View style={[styles.rope, { backgroundColor: RED, top: 12 }]} />
         <View style={[styles.rope, { backgroundColor: WHITE, top: 35 }]} />
         <View style={[styles.rope, { backgroundColor: BLUE, top: 58 }]} />
-      </View>
+      </Animated.View>
       <View style={styles.ringPostLeft} />
       <View style={styles.ringPostRight} />
       <View style={styles.canvas}>
@@ -723,15 +828,32 @@ function BoxingScene({
         </View>
       </View>
       <View style={styles.fighters}>
-        <View style={styles.fighterSlot}>
+        <Animated.View style={[styles.fighterSlot, { transform: [{ translateX: f1OffsetX ?? 0 }, { translateY: f1OffsetY ?? 0 }] }]}>
           <FighterSprite color={RED} pose={f1Pose} size={spriteSize} trunksColor={BLUE} gloveColor={RED} skinTone={skinFor(fighter1, "left")} />
-        </View>
-        <View style={[styles.fighterSlot, f2Down && styles.knockedSlot]}>
+        </Animated.View>
+        <Animated.View style={[styles.fighterSlot, f2Down && styles.knockedSlot, { transform: [{ translateX: f2OffsetX ?? 0 }, { translateY: f2OffsetY ?? 0 }] }]}>
           <FighterSprite color={BLUE} pose={f2Pose} mirrored size={f2Down ? spriteSize * 1.12 : spriteSize} trunksColor={WHITE} gloveColor={RED} skinTone={skinFor(fighter2, "right")} bootColor="#e8e4d8" />
-        </View>
+        </Animated.View>
       </View>
+      {impactKey ? <ImpactBurst key={impactKey} /> : null}
+      {ropeSide ? <Text style={[styles.ropePressure, ropeSide === "left" ? { left: 22 } : { right: 22 }]}>ROPES!</Text> : null}
       {overlay}
     </View>
+  );
+}
+
+function ImpactBurst() {
+  const pop = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(pop, { toValue: 1, duration: 90, useNativeDriver: true }),
+      Animated.timing(pop, { toValue: 0, duration: 260, useNativeDriver: true }),
+    ]).start();
+  }, [pop]);
+  return (
+    <Animated.View style={[styles.impactBurst, { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.25] }) }] }]}>
+      <Text style={styles.impactText}>*</Text>
+    </Animated.View>
   );
 }
 
@@ -890,6 +1012,9 @@ const styles = StyleSheet.create({
   fighters: { position: "absolute", left: 28, right: 28, bottom: "15%", flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", zIndex: 10 },
   fighterSlot: { width: "43%", alignItems: "center", justifyContent: "flex-end" },
   knockedSlot: { transform: [{ translateY: 24 }] },
+  impactBurst: { position: "absolute", left: "47%", bottom: "42%", zIndex: 26, width: 46, height: 46, alignItems: "center", justifyContent: "center" },
+  impactText: { color: GOLD, fontFamily: "Inter_700Bold", fontSize: 48, textShadowColor: RED, textShadowRadius: 6 },
+  ropePressure: { position: "absolute", bottom: "48%", color: "#d744d8", fontFamily: "Inter_700Bold", fontSize: 13, zIndex: 28, textShadowColor: BLACK, textShadowRadius: 4 },
   roundOverlay: { position: "absolute", top: "12%", left: 0, right: 0, alignItems: "center", zIndex: 20 },
   finalRound: { color: WHITE, fontFamily: "Inter_700Bold", fontSize: 28, textAlign: "center", textShadowColor: BLACK, textShadowRadius: 4 },
   bigFight: { color: GOLD, fontFamily: "Inter_700Bold", fontSize: 60, textAlign: "center", textShadowColor: RED, textShadowRadius: 7 },
