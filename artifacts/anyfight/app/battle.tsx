@@ -131,7 +131,7 @@ export default function BattleScreen() {
   const announce = useCallback((text: string) => {
     if (!voiceEnabled) return;
     stop();
-    speak(text, "onyx");
+    speak(text, "onyx", { quick: true });
   }, [speak, stop, voiceEnabled]);
 
   const finishFight = useCallback(async (side: "fighter1" | "fighter2", finalMeters: FightMeters) => {
