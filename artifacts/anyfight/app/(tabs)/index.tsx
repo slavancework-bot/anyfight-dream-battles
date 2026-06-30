@@ -25,6 +25,17 @@ const OUTFIT_OPTIONS: { key: OutfitChoice; label: string; icon: keyof typeof Ion
   { key: "wrestling", label: "Wrestling", icon: "trophy-outline" },
 ];
 
+const ARCADE = {
+  black: "#030303",
+  panel: "#080808",
+  gold: "#f2b92f",
+  red: "#e52e21",
+  blue: "#1267dd",
+  white: "#f7efe0",
+  muted: "#1a1a1a",
+  textMuted: "#b7aa8d",
+};
+
 async function apiFetchFighter(name: string, outfit: OutfitChoice, domain: string): Promise<Fighter> {
   const res = await fetch(`https://${domain}/api/fighters/generate`, {
     method: "POST",
@@ -110,10 +121,10 @@ export default function CreateScreen() {
     }
   };
 
-  const bgColor = colors.background;
-
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }]}>
+    <View style={styles.container}>
+      <LinearGradient colors={["#050505", "#0b0b0d", "#050505"]} style={StyleSheet.absoluteFill} />
+      <View style={styles.scanlines} pointerEvents="none" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[
@@ -128,43 +139,36 @@ export default function CreateScreen() {
       >
         {/* Logo */}
         <View style={styles.logoArea}>
-          <LinearGradient
-            colors={[colors.neonBlue, colors.neonPurple]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.logoGradient}
-          >
-            <Text style={styles.logoText}>ANYFIGHT</Text>
-          </LinearGradient>
-          <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
-            ANY PERSON · ANY CHARACTER · ANY BATTLE
-          </Text>
+          <View style={styles.leagueBadge}>
+            <Text style={styles.leagueText}>A.B.A.</Text>
+          </View>
+          <Text style={styles.logoText}>ANYFIGHT BOXING</Text>
+          <Text style={styles.tagline}>ANY PERSON / ANY CHARACTER / ANY BOUT</Text>
         </View>
 
         {/* Fighter 1 */}
         <FighterInput
-          label="FIGHTER 1"
+          label="1P CONTENDER"
           placeholder="Batman, Mike Tyson, Zeus..."
           value={name1}
           onChangeText={setName1}
           outfit={outfit1}
           onOutfitChange={setOutfit1}
           accentColor={colors.neonBlue}
-          colors={colors}
         />
 
         {/* VS Divider */}
         <View style={styles.vsDivider}>
-          <View style={[styles.vsLine, { backgroundColor: colors.border }]} />
-          <View style={[styles.vsCircle, { backgroundColor: colors.card, borderColor: colors.accent }]}>
-            <Text style={[styles.vsText, { color: colors.accent }]}>VS</Text>
+          <View style={styles.vsLine} />
+          <View style={styles.vsCircle}>
+            <Text style={styles.vsText}>VS</Text>
           </View>
-          <View style={[styles.vsLine, { backgroundColor: colors.border }]} />
+          <View style={styles.vsLine} />
         </View>
 
         {/* Fighter 2 */}
         <FighterInput
-          label="FIGHTER 2"
+          label="2P CONTENDER"
           placeholder='Iron Man, Goku... or "random"'
           value={name2}
           onChangeText={setName2}
@@ -172,7 +176,6 @@ export default function CreateScreen() {
           onOutfitChange={setOutfit2}
           accentColor={colors.neonPurple}
           hint='Try: "random" or "arch nemesis"'
-          colors={colors}
         />
 
         {/* Generate Button */}
@@ -182,7 +185,7 @@ export default function CreateScreen() {
           style={({ pressed }) => [styles.generateBtn, { opacity: pressed ? 0.85 : 1 }]}
         >
           <LinearGradient
-            colors={loading ? [colors.muted, colors.muted] : [colors.primary, colors.secondary]}
+            colors={loading ? [ARCADE.muted, ARCADE.muted] : [ARCADE.red, ARCADE.gold]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.generateGradient}
@@ -195,14 +198,14 @@ export default function CreateScreen() {
             ) : (
               <View style={styles.loadingRow}>
                 <Ionicons name="flash" size={18} color="#fff" />
-                <Text style={styles.generateBtnText}>GENERATE BATTLE</Text>
+                <Text style={styles.generateBtnText}>INSERT COIN - GENERATE BOUT</Text>
               </View>
             )}
           </LinearGradient>
         </Pressable>
 
         {/* Quick suggestions */}
-        <Text style={[styles.suggestTitle, { color: colors.mutedForeground }]}>DREAM BATTLES</Text>
+        <Text style={styles.suggestTitle}>SELECT DREAM BOUT</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.suggestions}>
           {SUGGESTIONS.map((s, i) => (
             <Pressable
@@ -211,9 +214,9 @@ export default function CreateScreen() {
                 setName1(s[0]);
                 setName2(s[1]);
               }}
-              style={[styles.suggestionChip, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={styles.suggestionChip}
             >
-              <Text style={[styles.suggestionText, { color: colors.text }]}>{s[0]} vs {s[1]}</Text>
+              <Text style={styles.suggestionText}>{s[0]} vs {s[1]}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -242,23 +245,22 @@ interface FighterInputProps {
   onOutfitChange: (o: OutfitChoice) => void;
   accentColor: string;
   hint?: string;
-  colors: ReturnType<typeof useColors>;
 }
 
-function FighterInput({ label, placeholder, value, onChangeText, outfit, onOutfitChange, accentColor, hint, colors }: FighterInputProps) {
+function FighterInput({ label, placeholder, value, onChangeText, outfit, onOutfitChange, accentColor, hint }: FighterInputProps) {
   return (
-    <View style={[styles.fighterSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[styles.fighterSection, { borderColor: accentColor }]}>
       <Text style={[styles.fighterLabel, { color: accentColor }]}>{label}</Text>
       <TextInput
-        style={[styles.textInput, { color: colors.text, borderColor: accentColor + "55", backgroundColor: colors.muted }]}
+        style={[styles.textInput, { borderColor: accentColor }]}
         placeholder={placeholder}
-        placeholderTextColor={colors.mutedForeground}
+        placeholderTextColor="#8f876f"
         value={value}
         onChangeText={onChangeText}
         autoCapitalize="words"
         returnKeyType="next"
       />
-      {hint && <Text style={[styles.hintText, { color: colors.mutedForeground }]}>{hint}</Text>}
+      {hint && <Text style={styles.hintText}>{hint}</Text>}
       <View style={styles.outfitRow}>
         {OUTFIT_OPTIONS.map((opt) => (
           <Pressable
@@ -267,13 +269,13 @@ function FighterInput({ label, placeholder, value, onChangeText, outfit, onOutfi
             style={[
               styles.outfitBtn,
               {
-                backgroundColor: outfit === opt.key ? accentColor + "22" : colors.muted,
-                borderColor: outfit === opt.key ? accentColor : colors.border,
+                backgroundColor: outfit === opt.key ? accentColor + "22" : ARCADE.muted,
+                borderColor: outfit === opt.key ? accentColor : "#34302a",
               },
             ]}
           >
-            <Ionicons name={opt.icon} size={14} color={outfit === opt.key ? accentColor : colors.mutedForeground} />
-            <Text style={[styles.outfitBtnText, { color: outfit === opt.key ? accentColor : colors.mutedForeground }]}>
+            <Ionicons name={opt.icon} size={14} color={outfit === opt.key ? accentColor : ARCADE.textMuted} />
+            <Text style={[styles.outfitBtnText, { color: outfit === opt.key ? accentColor : ARCADE.textMuted }]}>
               {opt.label}
             </Text>
           </Pressable>
@@ -284,34 +286,53 @@ function FighterInput({ label, placeholder, value, onChangeText, outfit, onOutfi
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: ARCADE.black },
   content: { paddingHorizontal: 16 },
   logoArea: { alignItems: "center", marginBottom: 28, marginTop: 8 },
-  logoGradient: { paddingHorizontal: 20, paddingVertical: 6, borderRadius: 6, marginBottom: 6 },
-  logoText: {
-    fontSize: 40,
-    fontFamily: "Inter_700Bold",
-    color: "#fff",
-    letterSpacing: 6,
+  leagueBadge: {
+    borderWidth: 2,
+    borderColor: ARCADE.gold,
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    marginBottom: 8,
+    backgroundColor: ARCADE.panel,
   },
-  tagline: { fontSize: 10, letterSpacing: 3, fontFamily: "Inter_500Medium", textTransform: "uppercase" },
+  leagueText: {
+    color: ARCADE.gold,
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 3,
+  },
+  logoText: {
+    fontSize: 32,
+    fontFamily: "Inter_700Bold",
+    color: ARCADE.white,
+    letterSpacing: 3,
+    textAlign: "center",
+    textShadowColor: ARCADE.red,
+    textShadowRadius: 5,
+  },
+  tagline: { color: ARCADE.gold, fontSize: 10, letterSpacing: 2, fontFamily: "Inter_700Bold", textTransform: "uppercase", textAlign: "center", marginTop: 6 },
   fighterSection: {
-    borderRadius: 12,
+    backgroundColor: ARCADE.panel,
+    borderRadius: 0,
     padding: 14,
-    borderWidth: 1,
+    borderWidth: 2,
     marginBottom: 8,
   },
   fighterLabel: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 2, marginBottom: 8 },
   textInput: {
     height: 48,
-    borderRadius: 8,
-    borderWidth: 1.5,
+    borderRadius: 0,
+    borderWidth: 2,
     paddingHorizontal: 14,
     fontSize: 16,
     fontFamily: "Inter_500Medium",
     marginBottom: 8,
+    color: ARCADE.white,
+    backgroundColor: "#111",
   },
-  hintText: { fontSize: 11, marginBottom: 8, fontFamily: "Inter_400Regular" },
+  hintText: { color: ARCADE.textMuted, fontSize: 11, marginBottom: 8, fontFamily: "Inter_400Regular" },
   outfitRow: { flexDirection: "row", gap: 6 },
   outfitBtn: {
     flex: 1,
@@ -320,27 +341,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
     paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 0,
+    borderWidth: 2,
   },
   outfitBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   vsDivider: { flexDirection: "row", alignItems: "center", marginVertical: 4 },
-  vsLine: { flex: 1, height: 1 },
+  vsLine: { flex: 1, height: 2, backgroundColor: "#4b4435" },
   vsCircle: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 0,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
     marginHorizontal: 12,
+    backgroundColor: ARCADE.panel,
+    borderColor: ARCADE.gold,
   },
-  vsText: { fontSize: 14, fontFamily: "Inter_700Bold", letterSpacing: 1 },
-  generateBtn: { marginTop: 16, borderRadius: 12, overflow: "hidden" },
+  vsText: { color: ARCADE.gold, fontSize: 14, fontFamily: "Inter_700Bold", letterSpacing: 1 },
+  generateBtn: { marginTop: 16, borderRadius: 0, overflow: "hidden", borderWidth: 2, borderColor: ARCADE.gold },
   generateGradient: { paddingVertical: 16, alignItems: "center" },
   loadingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  generateBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 2 },
+  generateBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1, textAlign: "center" },
   suggestTitle: {
+    color: ARCADE.gold,
     fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 2,
@@ -350,11 +374,14 @@ const styles = StyleSheet.create({
   },
   suggestions: { marginBottom: 12 },
   suggestionChip: {
+    backgroundColor: ARCADE.panel,
+    borderColor: "#4b4435",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
+    borderRadius: 0,
+    borderWidth: 2,
     marginRight: 8,
   },
-  suggestionText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  suggestionText: { color: ARCADE.white, fontSize: 12, fontFamily: "Inter_500Medium" },
+  scanlines: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,255,255,0.035)", opacity: 0.35 },
 });

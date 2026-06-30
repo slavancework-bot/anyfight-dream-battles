@@ -77,6 +77,45 @@ export interface BattleRecap {
   fullRecap: string;
 }
 
+export interface FightStats {
+  knockdowns: number;
+  maxCombo: number;
+  damageDealtPercent: number;
+  specialMoves: number;
+  punchesLanded: number;
+  finalHealth: {
+    fighter1: number;
+    fighter2: number;
+  };
+}
+
+export type BattleEventType =
+  | "jab"
+  | "hook"
+  | "uppercut"
+  | "block"
+  | "heavy_hit"
+  | "critical_hit"
+  | "counter"
+  | "special_move"
+  | "stagger"
+  | "knockdown"
+  | "ref_count"
+  | "finishing_blow";
+
+export interface BattleEvent {
+  round: number;
+  time: string;
+  attacker: "fighter1" | "fighter2";
+  defender: "fighter1" | "fighter2";
+  eventType: BattleEventType;
+  damage: number;
+  staminaDamage: number;
+  comboCount?: number;
+  commentary: string;
+  overlayText: string;
+}
+
 export interface SavedFighter extends Fighter {
   savedId: string;
   savedAt: string;
