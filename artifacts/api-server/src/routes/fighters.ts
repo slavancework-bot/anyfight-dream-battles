@@ -48,7 +48,7 @@ router.post("/fighters/image", async (req, res) => {
       return;
     }
 
-    const buffer = await generateImageBuffer(imagePrompt, "1024x1024");
+    const buffer = await generateImageBuffer(imagePrompt, "512x512");
     const base64 = buffer.toString("base64");
     imageCache.set(imagePrompt, base64);
     res.json({ imageData: base64 });

@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -19,6 +18,7 @@ import { useColors } from "@/hooks/useColors";
 import { useTTS } from "@/hooks/useTTS";
 import { FighterCard } from "@/components/FighterCard";
 import { FighterPortrait } from "@/components/FighterPortrait";
+import type { BattleNarration, Fighter, MatchupAnalysis } from "@/types";
 
 const ARCADE = {
   black: "#030303",
@@ -31,6 +31,16 @@ const ARCADE = {
 };
 
 type ReadSection = "all" | "analysis" | "stats" | "advantages";
+
+function buildQuickNarration(fighter1: Fighter, fighter2: Fighter, analysis: MatchupAnalysis): BattleNarration {
+  return {
+    intro: `The crowd is already loud as ${fighter1.name} and ${fighter2.name} step into the AnyFight ring.`,
+    fighter1Intro: `${fighter1.name}, "${fighter1.nickname || "The Contender"}", comes in with ${fighter1.fightingStyle} and the dangerous ${fighter1.signatureMove}.`,
+    fighter2Intro: `${fighter2.name}, "${fighter2.nickname || "The Contender"}", answers with ${fighter2.fightingStyle} and the dangerous ${fighter2.signatureMove}.`,
+    crowdAtmosphere: `${analysis.predictedWinner} is favored, but this arcade crowd wants chaos, counters, and a ridiculous finish.`,
+    fullNarration: `${fighter1.name} faces ${fighter2.name} in a fast AnyFight dream battle. ${analysis.fightStyle}`,
+  };
+}
 
 export default function MatchupScreen() {
   const colors = useColors();
@@ -92,23 +102,26 @@ export default function MatchupScreen() {
   };
 
   const handleFight = async () => {
+    if (loading) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setLoading(true);
-    try {
-      const res = await fetch(`https://${domain}/api/battle/narration`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fighter1, fighter2 }),
+    setNarration(buildQuickNarration(fighter1, fighter2, analysis));
+    router.push("/narration");
+
+    fetch(`https://${domain}/api/battle/narration`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fighter1, fighter2 }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("narration failed");
+        return res.json() as Promise<BattleNarration>;
+      })
+      .then((narration) => {
+        setNarration(narration);
+      })
+      .catch(() => {
       });
-      if (!res.ok) throw new Error();
-      const narration = await res.json();
-      setNarration(narration);
-      router.push("/narration");
-    } catch {
-      Alert.alert("Error", "Failed to generate battle intro. Try again.");
-    } finally {
-      setLoading(false);
-    }
   };
 
   const f1Pct = analysis.predictedWinner === fighter1.name ? analysis.winnerWinPercentage : analysis.loserWinPercentage;

@@ -15,6 +15,7 @@ const DIFFICULTY_COLOR: Record<string, string> = {
 
 const STORAGE_PREFIX = "portrait_v1_";
 const portraitCache = new Map<string, string>();
+const pendingPortraits = new Map<string, Promise<string>>();
 
 function storageKey(prompt: string) {
   let hash = 0;
@@ -37,6 +38,37 @@ async function saveToStorage(prompt: string, data: string): Promise<void> {
     await AsyncStorage.setItem(storageKey(prompt), data);
   } catch {
   }
+}
+
+async function fetchPortrait(prompt: string, signal: AbortSignal): Promise<string> {
+  const cached = portraitCache.get(prompt);
+  if (cached) return cached;
+
+  const pending = pendingPortraits.get(prompt);
+  if (pending) return pending;
+
+  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+  const request = fetch(`https://${domain}/api/fighters/image`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imagePrompt: prompt }),
+    signal,
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error("Image generation failed");
+      return res.json() as Promise<{ imageData: string }>;
+    })
+    .then((data) => {
+      portraitCache.set(prompt, data.imageData);
+      saveToStorage(prompt, data.imageData);
+      return data.imageData;
+    })
+    .finally(() => {
+      pendingPortraits.delete(prompt);
+    });
+
+  pendingPortraits.set(prompt, request);
+  return request;
 }
 
 export function useFighterPortrait(imagePrompt: string) {
@@ -64,8 +96,6 @@ export function useFighterPortrait(imagePrompt: string) {
     setError(false);
     setImageData(null);
 
-    const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-
     loadFromStorage(imagePrompt).then((cached) => {
       if (cancelled) return;
       if (cached) {
@@ -76,21 +106,10 @@ export function useFighterPortrait(imagePrompt: string) {
         return;
       }
 
-      fetch(`https://${domain}/api/fighters/image`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imagePrompt }),
-        signal: controller.signal,
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Image generation failed");
-          return res.json() as Promise<{ imageData: string }>;
-        })
-        .then((data) => {
+      fetchPortrait(imagePrompt, controller.signal)
+        .then((imageData) => {
           if (!cancelled) {
-            portraitCache.set(imagePrompt, data.imageData);
-            saveToStorage(imagePrompt, data.imageData);
-            setImageData(data.imageData);
+            setImageData(imageData);
           }
         })
         .catch(() => {
