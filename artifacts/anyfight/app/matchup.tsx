@@ -27,13 +27,17 @@ const ARCADE = {
   red: "#e52e21",
   white: "#f7efe0",
   border: "#4b4435",
+  textMuted: "#b7aa8d",
 };
+
+type ReadSection = "all" | "analysis" | "stats" | "advantages";
 
 export default function MatchupScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { fighter1, fighter2, analysis, setNarration } = useBattle();
   const [loading, setLoading] = useState(false);
+  const [activeReadSection, setActiveReadSection] = useState<ReadSection | null>(null);
 
   const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
   const { speak, stop, isPlaying, isLoading: ttsLoading } = useTTS(domain);
@@ -49,18 +53,41 @@ export default function MatchupScreen() {
     );
   }
 
-  const handleToggleRead = () => {
-    if (!analysis) return;
-    if (isPlaying) {
+  const buildSectionText = (section: ReadSection) => {
+    if (!analysis) return "";
+    const analysisText = [
+      "Fight analysis.",
+      analysis.narrativeExplanation,
+      `Fight style: ${analysis.fightStyle}.`,
+      `Predicted winner: ${analysis.predictedWinner} with ${analysis.winnerWinPercentage}% win chance.`,
+    ].join(" ");
+    const statsText = [
+      "Stat comparison.",
+      `Power: ${fighter1.name} ${analysis.powerComparison.fighter1Value}, ${fighter2.name} ${analysis.powerComparison.fighter2Value}.`,
+      `Speed: ${fighter1.name} ${analysis.speedComparison.fighter1Value}, ${fighter2.name} ${analysis.speedComparison.fighter2Value}.`,
+      `Intelligence: ${fighter1.name} ${analysis.intelligenceComparison.fighter1Value}, ${fighter2.name} ${analysis.intelligenceComparison.fighter2Value}.`,
+      `Special moves: ${analysis.specialMoveComparison}`,
+    ].join(" ");
+    const advantagesText = [
+      "Advantages.",
+      `${fighter1.name}: ${analysis.fighter1Advantages.join(". ")}.`,
+      `${fighter2.name}: ${analysis.fighter2Advantages.join(". ")}.`,
+    ].join(" ");
+
+    if (section === "analysis") return analysisText;
+    if (section === "stats") return statsText;
+    if (section === "advantages") return advantagesText;
+    return [analysisText, statsText, advantagesText].join(" ");
+  };
+
+  const handleToggleRead = (section: ReadSection) => {
+    if (isPlaying && activeReadSection === section) {
       stop();
+      setActiveReadSection(null);
     } else {
-      const text = [
-        analysis.narrativeExplanation,
-        `Fight style: ${analysis.fightStyle}.`,
-        `Special moves: ${analysis.specialMoveComparison}`,
-        `Predicted winner: ${analysis.predictedWinner} with ${analysis.winnerWinPercentage}% win chance.`,
-      ].join(" ");
-      speak(text, "nova");
+      stop();
+      setActiveReadSection(section);
+      speak(buildSectionText(section), "nova");
     }
   };
 
@@ -84,7 +111,6 @@ export default function MatchupScreen() {
     }
   };
 
-  const totalVotes = analysis.winnerWinPercentage + analysis.loserWinPercentage;
   const f1Pct = analysis.predictedWinner === fighter1.name ? analysis.winnerWinPercentage : analysis.loserWinPercentage;
   const f2Pct = analysis.predictedWinner === fighter2.name ? analysis.winnerWinPercentage : analysis.loserWinPercentage;
 
@@ -105,11 +131,11 @@ export default function MatchupScreen() {
           <Ionicons name="chevron-back" size={22} color={ARCADE.white} />
         </Pressable>
         <Text style={styles.headerTitle}>MATCHUP CARD</Text>
-        <Pressable onPress={handleToggleRead} style={styles.speakerBtn} hitSlop={10}>
+        <Pressable onPress={() => handleToggleRead("all")} style={styles.speakerBtn} hitSlop={10}>
           <Ionicons
-            name={ttsLoading ? "hourglass-outline" : isPlaying ? "volume-high" : "volume-mute"}
+            name={ttsLoading && activeReadSection === "all" ? "hourglass-outline" : isPlaying && activeReadSection === "all" ? "volume-high" : "volume-mute"}
             size={22}
-            color={isPlaying ? colors.neonPurple : colors.mutedForeground}
+            color={isPlaying && activeReadSection === "all" ? colors.neonPurple : colors.mutedForeground}
           />
         </Pressable>
       </View>
@@ -162,8 +188,15 @@ export default function MatchupScreen() {
         </View>
 
         {/* Narrative */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>FIGHT ANALYSIS</Text>
+        <View style={[styles.section, isPlaying && activeReadSection === "analysis" && styles.activeReadSection]}>
+          <SectionHeader
+            title="FIGHT ANALYSIS"
+            section="analysis"
+            activeSection={activeReadSection}
+            isPlaying={isPlaying}
+            isLoading={ttsLoading}
+            onPress={handleToggleRead}
+          />
           <Text style={[styles.narrative, { color: colors.mutedForeground }]}>{analysis.narrativeExplanation}</Text>
           <Text style={[styles.fightStyle, { color: colors.secondary }]}>
             <Ionicons name="flash" size={12} color={colors.secondary} /> {analysis.fightStyle}
@@ -171,8 +204,15 @@ export default function MatchupScreen() {
         </View>
 
         {/* Stat Comparisons */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>TALE OF THE TAPE</Text>
+        <View style={[styles.section, isPlaying && activeReadSection === "stats" && styles.activeReadSection]}>
+          <SectionHeader
+            title="STAT COMPARISON"
+            section="stats"
+            activeSection={activeReadSection}
+            isPlaying={isPlaying}
+            isLoading={ttsLoading}
+            onPress={handleToggleRead}
+          />
           <ComparisonRow
             label="POWER"
             f1Name={fighter1.name}
@@ -207,24 +247,34 @@ export default function MatchupScreen() {
         </View>
 
         {/* Advantages */}
-        <View style={styles.advantagesRow}>
-          <View style={styles.advantageCol}>
-            <Text style={[styles.advHeader, { color: colors.neonBlue }]}>{fighter1.name.split(" ")[0].toUpperCase()}</Text>
-            {analysis.fighter1Advantages.map((a, i) => (
-              <View key={i} style={styles.advItem}>
-                <Ionicons name="checkmark-circle" size={13} color={colors.neonGreen} />
-                <Text style={[styles.advText, { color: colors.mutedForeground }]}>{a}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={styles.advantageCol}>
-            <Text style={[styles.advHeader, { color: colors.neonPurple }]}>{fighter2.name.split(" ")[0].toUpperCase()}</Text>
-            {analysis.fighter2Advantages.map((a, i) => (
-              <View key={i} style={styles.advItem}>
-                <Ionicons name="checkmark-circle" size={13} color={colors.neonGreen} />
-                <Text style={[styles.advText, { color: colors.mutedForeground }]}>{a}</Text>
-              </View>
-            ))}
+        <View style={[styles.section, isPlaying && activeReadSection === "advantages" && styles.activeReadSection]}>
+          <SectionHeader
+            title="ADVANTAGES"
+            section="advantages"
+            activeSection={activeReadSection}
+            isPlaying={isPlaying}
+            isLoading={ttsLoading}
+            onPress={handleToggleRead}
+          />
+          <View style={styles.advantagesRow}>
+            <View style={styles.advantageCol}>
+              <Text style={[styles.advHeader, { color: colors.neonBlue }]}>{fighter1.name.split(" ")[0].toUpperCase()}</Text>
+              {analysis.fighter1Advantages.map((a, i) => (
+                <View key={i} style={styles.advItem}>
+                  <Ionicons name="checkmark-circle" size={13} color={colors.neonGreen} />
+                  <Text style={[styles.advText, { color: colors.mutedForeground }]}>{a}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.advantageCol}>
+              <Text style={[styles.advHeader, { color: colors.neonPurple }]}>{fighter2.name.split(" ")[0].toUpperCase()}</Text>
+              {analysis.fighter2Advantages.map((a, i) => (
+                <View key={i} style={styles.advItem}>
+                  <Ionicons name="checkmark-circle" size={13} color={colors.neonGreen} />
+                  <Text style={[styles.advText, { color: colors.mutedForeground }]}>{a}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -254,6 +304,33 @@ export default function MatchupScreen() {
           </LinearGradient>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+function SectionHeader({ title, section, activeSection, isPlaying, isLoading, onPress }: {
+  title: string;
+  section: ReadSection;
+  activeSection: ReadSection | null;
+  isPlaying: boolean;
+  isLoading: boolean;
+  onPress: (section: ReadSection) => void;
+}) {
+  const active = isPlaying && activeSection === section;
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Pressable
+        onPress={() => onPress(section)}
+        style={[styles.sectionSpeakerBtn, active && styles.sectionSpeakerActive]}
+        hitSlop={10}
+      >
+        <Ionicons
+          name={isLoading && activeSection === section ? "hourglass-outline" : active ? "volume-high" : "volume-medium-outline"}
+          size={17}
+          color={active ? ARCADE.gold : ARCADE.textMuted}
+        />
+      </Pressable>
     </View>
   );
 }
@@ -315,10 +392,37 @@ const styles = StyleSheet.create({
   probLabels: { flexDirection: "row", justifyContent: "space-between" },
   probLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
   section: { margin: 16, marginBottom: 0, padding: 16, borderRadius: 0, borderWidth: 2, borderColor: ARCADE.border, backgroundColor: ARCADE.panel },
-  sectionTitle: { color: ARCADE.gold, fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 2, marginBottom: 10 },
+  activeReadSection: {
+    borderColor: ARCADE.gold,
+    shadowColor: ARCADE.gold,
+    shadowOpacity: 0.75,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 5,
+  },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 },
+  sectionTitle: { color: ARCADE.gold, fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 2 },
+  sectionSpeakerBtn: {
+    width: 32,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: ARCADE.border,
+    backgroundColor: "#111",
+  },
+  sectionSpeakerActive: {
+    borderColor: ARCADE.gold,
+    backgroundColor: "#211704",
+    shadowColor: ARCADE.gold,
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
   narrative: { fontSize: 13, lineHeight: 19, fontFamily: "Inter_400Regular", marginBottom: 8 },
   fightStyle: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  advantagesRow: { flexDirection: "row", gap: 8, marginHorizontal: 16, marginTop: 16 },
+  advantagesRow: { flexDirection: "row", gap: 8 },
   advantageCol: { flex: 1, padding: 12, borderRadius: 0, borderWidth: 2, borderColor: ARCADE.border, backgroundColor: ARCADE.panel },
   advHeader: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1.5, marginBottom: 8 },
   advItem: { flexDirection: "row", alignItems: "flex-start", gap: 4, marginBottom: 4 },

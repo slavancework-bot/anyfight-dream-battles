@@ -36,6 +36,115 @@ const ARCADE = {
   textMuted: "#b7aa8d",
 };
 
+type DreamBattlePreset = {
+  category: string;
+  fighter1: string;
+  fighter2: string;
+};
+
+const DREAM_BATTLE_CATEGORIES: { title: string; matchups: [string, string][] }[] = [
+  {
+    title: "COMIC BOOK COLLISIONS",
+    matchups: [
+      ["Batman", "Iron Man"],
+      ["Spider-Man", "The Flash"],
+      ["Wonder Woman", "Captain Marvel"],
+      ["Black Panther", "Wolverine"],
+      ["Harley Quinn", "Deadpool"],
+      ["Joker", "Green Goblin"],
+      ["Thor", "Shazam"],
+    ],
+  },
+  {
+    title: "ANIME POWER HOUR",
+    matchups: [
+      ["Goku", "Superman"],
+      ["Naruto", "Luffy"],
+      ["Vegeta", "Saitama"],
+      ["Sailor Moon", "Frieza"],
+      ["Tanjiro", "Ichigo"],
+      ["All Might", "Hulk"],
+      ["Ash Ketchum", "Yugi Moto"],
+    ],
+  },
+  {
+    title: "REAL LEGENDS",
+    matchups: [
+      ["Mike Tyson", "Muhammad Ali"],
+      ["Bruce Lee", "Jackie Chan"],
+      ["Serena Williams", "Simone Biles"],
+      ["Dwayne Johnson", "John Cena"],
+      ["Babe Ruth", "Tom Brady"],
+      ["Shaq", "Andre the Giant"],
+      ["Ronda Rousey", "Chun-Li"],
+    ],
+  },
+  {
+    title: "MYTHS AND MONSTERS",
+    matchups: [
+      ["Zeus", "Thor"],
+      ["Hercules", "Gilgamesh"],
+      ["King Kong", "Godzilla"],
+      ["Medusa", "Dracula"],
+      ["Bigfoot", "The Mummy"],
+      ["Kraken", "Cthulhu"],
+      ["Cerberus", "The Minotaur"],
+    ],
+  },
+  {
+    title: "GAME NIGHT",
+    matchups: [
+      ["Mario", "Sonic"],
+      ["Link", "Cloud Strife"],
+      ["Master Chief", "Doom Slayer"],
+      ["Lara Croft", "Samus Aran"],
+      ["Pac-Man", "Kirby"],
+      ["Ryu", "Scorpion"],
+      ["Princess Peach", "Zelda"],
+    ],
+  },
+  {
+    title: "HISTORY'S WEIRDEST CARD",
+    matchups: [
+      ["Abraham Lincoln", "Julius Caesar"],
+      ["Cleopatra", "Joan of Arc"],
+      ["Napoleon", "George Washington"],
+      ["Albert Einstein", "Isaac Newton"],
+      ["Genghis Khan", "Alexander the Great"],
+      ["Leonardo da Vinci", "Nikola Tesla"],
+      ["Queen Elizabeth I", "Marie Curie"],
+    ],
+  },
+  {
+    title: "MOVIE MAYHEM",
+    matchups: [
+      ["Darth Vader", "Thanos"],
+      ["Indiana Jones", "Han Solo"],
+      ["Rocky Balboa", "Clubber Lang"],
+      ["James Bond", "Jason Bourne"],
+      ["The Terminator", "Robocop"],
+      ["Ellen Ripley", "Sarah Connor"],
+      ["John Wick", "The Bride"],
+    ],
+  },
+  {
+    title: "COMEDY CHAOS",
+    matchups: [
+      ["Mr. Bean", "Austin Powers"],
+      ["Bugs Bunny", "Daffy Duck"],
+      ["Shrek", "Donkey"],
+      ["SpongeBob", "Patrick Star"],
+      ["Homer Simpson", "Peter Griffin"],
+      ["Ron Burgundy", "Michael Scott"],
+      ["The Grinch", "Buddy the Elf"],
+    ],
+  },
+];
+
+const DREAM_BATTLE_PRESETS: DreamBattlePreset[] = DREAM_BATTLE_CATEGORIES.flatMap((group) =>
+  group.matchups.map(([fighter1, fighter2]) => ({ category: group.title, fighter1, fighter2 })),
+);
+
 async function apiFetchFighter(name: string, outfit: OutfitChoice, domain: string): Promise<Fighter> {
   const res = await fetch(`https://${domain}/api/fighters/generate`, {
     method: "POST",
@@ -78,6 +187,15 @@ export default function CreateScreen() {
 
   const isRandom = (name: string) => name.trim().toLowerCase() === "random" || name.trim() === "";
   const isArchNemesis = (name: string) => name.trim().toLowerCase().includes("arch nemesis") || name.trim().toLowerCase().includes("arch-nemesis");
+  const selectPreset = (preset: DreamBattlePreset) => {
+    Haptics.selectionAsync();
+    setName1(preset.fighter1);
+    setName2(preset.fighter2);
+  };
+  const handleShufflePreset = () => {
+    const preset = DREAM_BATTLE_PRESETS[Math.floor(Math.random() * DREAM_BATTLE_PRESETS.length)];
+    selectPreset(preset);
+  };
 
   const handleGenerate = async () => {
     const trimmed1 = name1.trim();
@@ -204,37 +322,41 @@ export default function CreateScreen() {
           </LinearGradient>
         </Pressable>
 
-        {/* Quick suggestions */}
-        <Text style={styles.suggestTitle}>SELECT DREAM BOUT</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.suggestions}>
-          {SUGGESTIONS.map((s, i) => (
-            <Pressable
-              key={i}
-              onPress={() => {
-                setName1(s[0]);
-                setName2(s[1]);
-              }}
-              style={styles.suggestionChip}
-            >
-              <Text style={styles.suggestionText}>{s[0]} vs {s[1]}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+        {/* Dream Battles */}
+        <View style={styles.dreamHeader}>
+          <View>
+            <Text style={styles.suggestTitle}>DREAM BATTLES</Text>
+            <Text style={styles.suggestSubtitle}>{DREAM_BATTLE_PRESETS.length} CURATED ARCADE MATCHUPS</Text>
+          </View>
+          <Pressable onPress={handleShufflePreset} style={styles.shuffleBtn}>
+            <Ionicons name="shuffle" size={15} color={ARCADE.gold} />
+            <Text style={styles.shuffleText}>SHUFFLE</Text>
+          </Pressable>
+        </View>
+        {DREAM_BATTLE_CATEGORIES.map((group) => (
+          <View key={group.title} style={styles.categoryBlock}>
+            <Text style={styles.categoryTitle}>{group.title}</Text>
+            <View style={styles.presetGrid}>
+              {group.matchups.map(([fighter1, fighter2]) => (
+                <Pressable
+                  key={`${fighter1}-${fighter2}`}
+                  onPress={() => selectPreset({ category: group.title, fighter1, fighter2 })}
+                  style={({ pressed }) => [styles.presetCard, pressed && styles.presetPressed]}
+                >
+                  <Text style={styles.presetLabel}>1P</Text>
+                  <Text style={styles.presetName} numberOfLines={1}>{fighter1}</Text>
+                  <Text style={styles.presetVs}>VS</Text>
+                  <Text style={[styles.presetLabel, styles.presetLabelRight]}>2P</Text>
+                  <Text style={styles.presetName} numberOfLines={1}>{fighter2}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ))}
       </ScrollView>
     </View>
   );
 }
-
-const SUGGESTIONS = [
-  ["Batman", "Iron Man"],
-  ["Goku", "Superman"],
-  ["Mike Tyson", "Muhammad Ali"],
-  ["Zeus", "Thor"],
-  ["Mario", "Sonic"],
-  ["Abraham Lincoln", "Julius Caesar"],
-  ["King Kong", "Godzilla"],
-  ["Sherlock Holmes", "James Bond"],
-];
 
 interface FighterInputProps {
   label: string;
@@ -365,23 +487,60 @@ const styles = StyleSheet.create({
   generateBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1, textAlign: "center" },
   suggestTitle: {
     color: ARCADE.gold,
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
     letterSpacing: 2,
     textTransform: "uppercase",
-    marginTop: 24,
-    marginBottom: 10,
   },
-  suggestions: { marginBottom: 12 },
-  suggestionChip: {
+  suggestSubtitle: {
+    color: ARCADE.textMuted,
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 1.3,
+    marginTop: 3,
+  },
+  dreamHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  shuffleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: ARCADE.panel,
     borderColor: "#4b4435",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
     borderRadius: 0,
     borderWidth: 2,
-    marginRight: 8,
   },
-  suggestionText: { color: ARCADE.white, fontSize: 12, fontFamily: "Inter_500Medium" },
+  shuffleText: { color: ARCADE.gold, fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1 },
+  categoryBlock: { marginBottom: 18 },
+  categoryTitle: {
+    color: ARCADE.white,
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 1.7,
+    marginBottom: 8,
+  },
+  presetGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  presetCard: {
+    width: "48.6%",
+    minHeight: 92,
+    backgroundColor: ARCADE.panel,
+    borderWidth: 2,
+    borderColor: "#3f382d",
+    padding: 9,
+    justifyContent: "space-between",
+  },
+  presetPressed: { borderColor: ARCADE.gold, backgroundColor: "#15100a" },
+  presetLabel: { color: ARCADE.red, fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 1 },
+  presetLabelRight: { color: ARCADE.blue, marginTop: 4 },
+  presetName: { color: ARCADE.white, fontSize: 12, fontFamily: "Inter_700Bold" },
+  presetVs: { color: ARCADE.gold, fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1, textAlign: "center" },
   scanlines: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,255,255,0.035)", opacity: 0.35 },
 });
