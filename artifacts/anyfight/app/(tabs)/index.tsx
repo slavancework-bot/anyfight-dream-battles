@@ -206,6 +206,17 @@ export default function CreateScreen() {
           </LinearGradient>
         </Pressable>
 
+        {/* Sample Arena Button */}
+        <Pressable
+          onPress={() => router.push("/arena-preview?sample=1")}
+          style={({ pressed }) => [styles.sampleBtn, { opacity: pressed ? 0.85 : 1 }]}
+        >
+          <View style={styles.sampleBtnContent}>
+            <Ionicons name="videocam-outline" size={16} color={ARCADE.textMuted} />
+            <Text style={styles.sampleBtnText}>WATCH SAMPLE ARENA PREVIEW (NO API)</Text>
+          </View>
+        </Pressable>
+
         {/* Dream Bouts Grid */}
         <View style={styles.suggestHeader}>
           <Text style={styles.suggestTitle}>DREAM BOUTS</Text>
@@ -451,6 +462,9 @@ const styles = StyleSheet.create({
   generateGradient: { paddingVertical: 16, alignItems: "center" },
   loadingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   generateBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1, textAlign: "center" },
+  sampleBtn: { marginTop: 12, borderRadius: 0, borderWidth: 2, borderColor: "#4b4435", backgroundColor: ARCADE.panel },
+  sampleBtnContent: { paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  sampleBtnText: { fontSize: 11, fontFamily: "Inter_700Bold", color: ARCADE.textMuted, letterSpacing: 1 },
   suggestHeader: {
     flexDirection: "row",
     alignItems: "center",

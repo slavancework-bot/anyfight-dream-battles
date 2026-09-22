@@ -26,6 +26,15 @@ interface FighterSpriteProps {
   gloveColor?: string;
   bootColor?: string;
   idleBehavior?: "guard" | "dance" | "stalk" | "hop" | "breathe" | "clap" | "bounce" | "stumble";
+  accessories?: {
+    helmet?: string;
+    cape?: string;
+    suit?: string;
+    tie?: string;
+    armor?: string;
+    robe?: string;
+    hair?: string;
+  };
 }
 
 const OUTLINE = "#1a0d08";
@@ -49,6 +58,7 @@ export default function FighterSprite({
   gloveColor,
   bootColor = "#f1efe2",
   idleBehavior = "bounce",
+  accessories,
 }: FighterSpriteProps) {
   const bounce = useRef(new Animated.Value(0)).current;
   const activePose = normalizePose(pose);
@@ -80,19 +90,25 @@ export default function FighterSprite({
           <G>
             <Rect x={16} y={72} width={108} height={10} fill={SHADOW} />
             <G transform="translate(12 18)">
-              {pixelRect(18, 32, 40, 24, skinTone)}
+              {pixelRect(18, 32, 40, 24, accessories?.armor || accessories?.suit || accessories?.robe || skinTone)}
               {pixelRect(8, 36, 18, 16, gloves)}
               {pixelRect(54, 36, 18, 16, gloves)}
-              {pixelRect(56, 24, 18, 22, skinTone)}
-              <Rect x={61} y={28} width={4} height={4} fill={OUTLINE} />
-              <Rect x={54} y={21} width={24} height={7} fill="#3a2018" />
+              {pixelRect(56, 24, 18, 22, accessories?.helmet || skinTone)}
+              {!accessories?.helmet && <Rect x={61} y={28} width={4} height={4} fill={OUTLINE} />}
+              {accessories?.helmet ? (
+                <Rect x={54} y={21} width={24} height={10} fill="#111" />
+              ) : accessories?.hair ? (
+                <Path d="M50 20 Q 70 10 75 30 Z" fill={accessories.hair} stroke={OUTLINE} strokeWidth={2} />
+              ) : (
+                <Rect x={54} y={21} width={24} height={7} fill="#3a2018" />
+              )}
               {pixelRect(18, 54, 34, 18, trunks)}
               {pixelRect(50, 58, 34, 14, trunks)}
-              {pixelRect(78, 60, 26, 12, skinTone)}
+              {pixelRect(78, 60, 26, 12, accessories?.suit || accessories?.armor || accessories?.robe || skinTone)}
               {pixelRect(100, 58, 28, 12, bootColor)}
-              {pixelRect(18, 70, 24, 10, skinTone)}
+              {pixelRect(18, 70, 24, 10, accessories?.suit || accessories?.armor || accessories?.robe || skinTone)}
               {pixelRect(2, 68, 28, 12, bootColor)}
-              <Rect x={22} y={56} width={24} height={4} fill="#fff" opacity={0.8} />
+              <Rect x={22} y={56} width={24} height={4} fill={accessories?.suit ? "#111" : "#fff"} opacity={0.8} />
             </G>
           </G>
         </Svg>
@@ -124,23 +140,48 @@ export default function FighterSprite({
         <G transform={`translate(${poseOffset} 0)`}>
           <Rect x={25} y={158} width={70} height={9} fill={SHADOW} />
           <G transform={bodyTilt ? `rotate(${bodyTilt})` : undefined}>
-            <Polygon points="44,52 71,52 82,92 35,92" fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
+            {accessories?.cape && (
+              <Path d={activePose === "winner" ? "M45 35 L10 130 L70 130 Z" : "M40 30 L20 130 L80 130 Z"} fill={accessories.cape} stroke={OUTLINE} strokeWidth={2} />
+            )}
+            <Polygon points="44,52 71,52 82,92 35,92" fill={accessories?.armor || accessories?.suit || accessories?.robe || skinTone} stroke={OUTLINE} strokeWidth={3} />
+            {accessories?.suit && (
+              <G>
+                <Polygon points="46,52 69,52 57,75" fill="#ffffff" stroke={OUTLINE} strokeWidth={1} />
+                {accessories.tie && <Polygon points="54,60 60,60 57,75" fill={accessories.tie} />}
+              </G>
+            )}
             <Rect x={48} y={47} width={18} height={9} fill={skinTone} stroke={OUTLINE} strokeWidth={2} />
-            <Rect x={40} y={16} width={30} height={34} fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
-            <Rect x={35} y={14} width={36} height={12} fill="#3a2018" stroke={OUTLINE} strokeWidth={2} />
-            <Rect x={65} y={28} width={6} height={8} fill={skinTone} stroke={OUTLINE} strokeWidth={2} />
-            <Rect x={61} y={31} width={5} height={5} fill={OUTLINE} />
-            <Rect x={50} y={43} width={12} height={4} fill={OUTLINE} opacity={0.7} />
+            <Rect x={40} y={16} width={30} height={34} fill={accessories?.helmet || skinTone} stroke={OUTLINE} strokeWidth={3} />
 
-            <Path d="M39 58 L24 70 L31 83 L48 68 Z" fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
-            <Path d={activePose === "winner" ? "M45 59 L48 25 L59 28 L57 61 Z" : "M70 58 L85 69 L79 83 L62 68 Z"} fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
+            {accessories?.helmet ? (
+              <G>
+                <Rect x={35} y={12} width={40} height={14} fill="#222" stroke={OUTLINE} strokeWidth={2} />
+                <Polygon points="40,26 70,26 65,45 45,45" fill={accessories.helmet} />
+                <Rect x={45} y={30} width={20} height={6} fill="#000" />
+              </G>
+            ) : accessories?.hair ? (
+              <Path d="M35 25 Q 55 -5 75 25 Z" fill={accessories.hair} stroke={OUTLINE} strokeWidth={2} />
+            ) : (
+              <Rect x={35} y={14} width={36} height={12} fill="#3a2018" stroke={OUTLINE} strokeWidth={2} />
+            )}
+
+            {!accessories?.helmet && (
+              <G>
+                <Rect x={65} y={28} width={6} height={8} fill={skinTone} stroke={OUTLINE} strokeWidth={2} />
+                <Rect x={61} y={31} width={5} height={5} fill={OUTLINE} />
+                <Rect x={50} y={43} width={12} height={4} fill={OUTLINE} opacity={0.7} />
+              </G>
+            )}
+
+            <Path d="M39 58 L24 70 L31 83 L48 68 Z" fill={accessories?.armor || accessories?.suit || accessories?.robe || skinTone} stroke={OUTLINE} strokeWidth={3} />
+            <Path d={activePose === "winner" ? "M45 59 L48 25 L59 28 L57 61 Z" : "M70 58 L85 69 L79 83 L62 68 Z"} fill={accessories?.armor || accessories?.suit || accessories?.robe || skinTone} stroke={OUTLINE} strokeWidth={3} />
             {pixelRect(rearGlove.x, rearGlove.y, rearGlove.w, rearGlove.h, gloves)}
             {pixelRect(leadGlove.x, leadGlove.y, leadGlove.w, leadGlove.h, gloves)}
 
             <Polygon points="34,88 83,88 77,122 41,122" fill={trunks} stroke={OUTLINE} strokeWidth={3} />
-            <Rect x={41} y={88} width={35} height={7} fill="#fff" opacity={0.9} />
-            <Path d="M42 119 L33 146 L46 150 L60 121 Z" fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
-            <Path d="M73 119 L83 145 L69 150 L57 121 Z" fill={skinTone} stroke={OUTLINE} strokeWidth={3} />
+            <Rect x={41} y={88} width={35} height={7} fill={accessories?.suit ? "#111" : "#fff"} opacity={0.9} />
+            <Path d="M42 119 L33 146 L46 150 L60 121 Z" fill={accessories?.suit || accessories?.armor || accessories?.robe || skinTone} stroke={OUTLINE} strokeWidth={3} />
+            <Path d="M73 119 L83 145 L69 150 L57 121 Z" fill={accessories?.suit || accessories?.armor || accessories?.robe || skinTone} stroke={OUTLINE} strokeWidth={3} />
             <Rect x={26} y={144} width={25} height={18} fill={bootColor} stroke={OUTLINE} strokeWidth={3} />
             <Rect x={64} y={144} width={27} height={18} fill={bootColor} stroke={OUTLINE} strokeWidth={3} />
             <Rect x={28} y={151} width={21} height={4} fill={trunks} opacity={0.9} />
