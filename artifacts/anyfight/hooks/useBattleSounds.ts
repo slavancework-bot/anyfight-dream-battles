@@ -4,6 +4,9 @@ import { Platform } from "react-native";
 type SoundType = "light" | "heavy" | "special" | "ultimate" | "ko" | "roundStart" | "block" | "crowd" | "bell" | "camera" | "announcer";
 
 const nativePlayers = new Set<AudioPlayer>();
+const webSources = new Set<OscillatorNode | AudioBufferSourceNode>();
+const scheduledWebSounds = new Set<ReturnType<typeof setTimeout>>();
+let soundGeneration = 0;
 
 function getAudioContext(): AudioContext | null {
   if (Platform.OS !== "web") return null;
@@ -31,6 +34,8 @@ function playTone(ctx: AudioContext, type: OscillatorType, freq: number, gainPea
   gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
   osc.start(ctx.currentTime);
   osc.stop(ctx.currentTime + duration + 0.01);
+  webSources.add(osc);
+  osc.addEventListener("ended", () => webSources.delete(osc), { once: true });
 }
 
 function playNoise(ctx: AudioContext, gainPeak: number, duration: number, cutoffFreq: number) {
@@ -51,13 +56,25 @@ function playNoise(ctx: AudioContext, gainPeak: number, duration: number, cutoff
   gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
   source.start(ctx.currentTime);
   source.stop(ctx.currentTime + duration + 0.01);
+  webSources.add(source);
+  source.addEventListener("ended", () => webSources.delete(source), { once: true });
 }
 
-function synthesizeWeb(type: SoundType) {
+function scheduleWebSound(callback: () => void, delay: number) {
+  const timer = setTimeout(() => {
+    scheduledWebSounds.delete(timer);
+    callback();
+  }, delay);
+  scheduledWebSounds.add(timer);
+}
+
+function synthesizeWeb(type: SoundType, generation = soundGeneration) {
   const ctx = getAudioContext();
   if (!ctx) return false;
   if (ctx.state === "suspended") {
-    ctx.resume().then(() => synthesizeWeb(type));
+    ctx.resume().then(() => {
+      if (generation === soundGeneration) synthesizeWeb(type, generation);
+    });
     return true;
   }
 
@@ -92,7 +109,7 @@ function synthesizeWeb(type: SoundType) {
     case "roundStart":
     case "bell":
       playTone(ctx, "sine", 660, 0.3, 0.15);
-      setTimeout(() => playTone(ctx, "sine", 880, 0.4, 0.25), 160);
+      scheduleWebSound(() => playTone(ctx, "sine", 880, 0.4, 0.25), 160);
       break;
     case "camera":
       playNoise(ctx, 0.18, 0.04, 5000);
@@ -100,7 +117,7 @@ function synthesizeWeb(type: SoundType) {
       break;
     case "announcer":
       playTone(ctx, "sawtooth", 260, 0.18, 0.12, 520);
-      setTimeout(() => playTone(ctx, "square", 640, 0.16, 0.14, 320), 90);
+      scheduleWebSound(() => playTone(ctx, "square", 640, 0.16, 0.14, 320), 90);
       break;
     case "crowd":
       playNoise(ctx, 0.16, 0.55, 950);
@@ -180,6 +197,26 @@ function synthesizeNative(type: SoundType) {
   }, 1200);
 }
 
+function stopAllBattleSounds() {
+  soundGeneration += 1;
+  scheduledWebSounds.forEach((timer) => clearTimeout(timer));
+  scheduledWebSounds.clear();
+  webSources.forEach((source) => {
+    try {
+      source.stop();
+      source.disconnect();
+    } catch {}
+  });
+  webSources.clear();
+  nativePlayers.forEach((player) => {
+    try {
+      player.pause();
+      player.remove();
+    } catch {}
+  });
+  nativePlayers.clear();
+}
+
 export function useBattleSounds() {
   const play = (type: SoundType) => {
     try {
@@ -187,5 +224,5 @@ export function useBattleSounds() {
     } catch {
     }
   };
-  return { play };
+  return { play, stop: stopAllBattleSounds };
 }

@@ -114,6 +114,7 @@ export default function BattleScreen() {
   const endedRef = useRef(false);
   const startTimeRef = useRef(Date.now());
   const eventLogRef = useRef<BattleEvent[]>([]);
+  const initialEventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const events = useMemo(() => {
     if (!fighter1 || !fighter2) return [];
@@ -224,7 +225,11 @@ export default function BattleScreen() {
 
   const enterArena = useCallback(() => {
     setPhase("arena");
-    setTimeout(() => playEvent(0), 260);
+    if (initialEventTimerRef.current) clearTimeout(initialEventTimerRef.current);
+    initialEventTimerRef.current = setTimeout(() => {
+      initialEventTimerRef.current = null;
+      playEvent(0);
+    }, 260);
   }, [playEvent]);
 
   const skipToFinish = useCallback(() => {
@@ -240,12 +245,54 @@ export default function BattleScreen() {
     return () => clearTimeout(timeout);
   }, [enterArena, phase]);
 
+  const autoModeRef = useRef(autoMode);
+  autoModeRef.current = autoMode;
+
+  const eventIndexRef = useRef(eventIndex);
+  eventIndexRef.current = eventIndex;
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playEventRef = useRef(playEvent);
+  playEventRef.current = playEvent;
+
   useEffect(() => {
-    if (phase !== "arena" || paused || !autoMode || endedRef.current || eventIndex < 0) return;
+    if (phase !== "arena" || paused || !autoMode || endedRef.current || eventIndex < 0) {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
+    }
     const delay = fastForward ? 620 : 1650;
-    const timeout = setTimeout(() => playEvent(eventIndex + 1), delay);
-    return () => clearTimeout(timeout);
-  }, [autoMode, eventIndex, fastForward, paused, phase, playEvent]);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      playEventRef.current(eventIndexRef.current + 1);
+    }, delay);
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [autoMode, eventIndex, fastForward, paused, phase]);
+
+  useEffect(() => {
+    if (phase === "arena" && !paused && autoMode && eventIndex < 0 && !initialEventTimerRef.current) {
+      initialEventTimerRef.current = setTimeout(() => {
+        initialEventTimerRef.current = null;
+        playEventRef.current(0);
+      }, 260);
+      return;
+    }
+    if ((paused || !autoMode || phase !== "arena") && initialEventTimerRef.current) {
+      clearTimeout(initialEventTimerRef.current);
+      initialEventTimerRef.current = null;
+    }
+  }, [autoMode, eventIndex, paused, phase]);
 
   useEffect(() => {
     if (phase !== "arena" || paused) return;
@@ -255,7 +302,11 @@ export default function BattleScreen() {
     return () => clearInterval(timer);
   }, [paused, phase]);
 
-  useEffect(() => () => stop(), [stop]);
+  useEffect(() => () => {
+    if (initialEventTimerRef.current) clearTimeout(initialEventTimerRef.current);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    stop();
+  }, [stop]);
 
   if (!fighter1 || !fighter2) {
     return (

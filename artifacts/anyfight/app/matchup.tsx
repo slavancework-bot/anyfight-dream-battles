@@ -319,6 +319,10 @@ export default function MatchupScreen() {
             )}
           </LinearGradient>
         </Pressable>
+        <Pressable onPress={() => router.push("/arena-preview")} disabled={loading} style={({ pressed }) => [styles.previewBtn, { opacity: pressed ? 0.85 : 1 }]}>
+          <Ionicons name="videocam-outline" size={16} color={ARCADE.gold} />
+          <Text style={styles.previewText}>PREVIEW ARENA ACTION</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -451,5 +455,7 @@ const styles = StyleSheet.create({
   fightGradient: { paddingVertical: 16, alignItems: "center" },
   fightRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   fightText: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 3 },
+  previewBtn: { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 12, borderWidth: 2, borderColor: ARCADE.gold, backgroundColor: ARCADE.panel },
+  previewText: { fontSize: 12, fontFamily: "Inter_700Bold", color: ARCADE.gold, letterSpacing: 1 },
   scanlines: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,255,255,0.035)", opacity: 0.35 },
 });

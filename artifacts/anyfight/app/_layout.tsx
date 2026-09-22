@@ -29,6 +29,7 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="matchup" options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="arena-preview" options={{ headerShown: false, animation: "slide_from_bottom" }} />
       <Stack.Screen name="narration" options={{ headerShown: false, animation: "fade" }} />
       <Stack.Screen name="battle" options={{ headerShown: false, animation: "fade" }} />
       <Stack.Screen name="recap" options={{ headerShown: false, animation: "fade" }} />
