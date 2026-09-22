@@ -18,6 +18,19 @@ export interface WrestlingPersona {
   ringGearDescription: string;
 }
 
+export interface FighterPersonality {
+  aggression: number;
+  confidence: number;
+  cowardice: number;
+  showmanship: number;
+  discipline: number;
+  humor: number;
+  dirtyFighting: number;
+  sportsmanship: number;
+  riskTaking: number;
+  temper: number;
+}
+
 export interface Fighter {
   name: string;
   nickname: string;
@@ -37,6 +50,7 @@ export interface Fighter {
   outfitChoice: "plain" | "signature" | "wrestling";
   outfitDescription: string;
   wrestlingPersona?: WrestlingPersona;
+  personality?: FighterPersonality;
   imagePrompt: string;
 }
 
@@ -134,6 +148,18 @@ Respond ONLY with valid JSON matching this exact structure:
   "archNemesisReason": "1-2 funny/insightful sentences about why this rivalry exists — reference real events or canonical lore",
   "estimatedDifficulty": "one of: Rookie, Challenger, Veteran, Elite, Legendary, Mythical",
   "funFacts": ["genuinely surprising real fact twisted for fighting context", "another real fun fact", "a third one"],
+  "personality": {
+    "aggression": <1-100>,
+    "confidence": <1-100>,
+    "cowardice": <1-100>,
+    "showmanship": <1-100>,
+    "discipline": <1-100>,
+    "humor": <1-100>,
+    "dirtyFighting": <1-100>,
+    "sportsmanship": <1-100>,
+    "riskTaking": <1-100>,
+    "temper": <1-100>
+  },
   "outfitChoice": "${outfitChoice}",
   "outfitDescription": "detailed description of what they are wearing",
   ${
@@ -168,6 +194,18 @@ Respond ONLY with valid JSON matching this exact structure:
     skill: data.stats?.skill ?? 50,
     intelligence: data.stats?.intelligence ?? 50,
   };
+  const personality: FighterPersonality = {
+    aggression: data.personality?.aggression ?? Math.round((statsWithoutOverall.power + statsWithoutOverall.skill) / 2),
+    confidence: data.personality?.confidence ?? Math.max(35, statsWithoutOverall.skill),
+    cowardice: data.personality?.cowardice ?? Math.max(5, 100 - statsWithoutOverall.defense),
+    showmanship: data.personality?.showmanship ?? Math.max(20, statsWithoutOverall.skill),
+    discipline: data.personality?.discipline ?? Math.round((statsWithoutOverall.defense + statsWithoutOverall.intelligence) / 2),
+    humor: data.personality?.humor ?? 50,
+    dirtyFighting: data.personality?.dirtyFighting ?? Math.max(10, 100 - statsWithoutOverall.intelligence),
+    sportsmanship: data.personality?.sportsmanship ?? Math.max(15, statsWithoutOverall.defense),
+    riskTaking: data.personality?.riskTaking ?? Math.round((statsWithoutOverall.power + statsWithoutOverall.speed) / 2),
+    temper: data.personality?.temper ?? Math.max(15, 100 - statsWithoutOverall.defense),
+  };
 
   return {
     name: data.name ?? name,
@@ -191,6 +229,7 @@ Respond ONLY with valid JSON matching this exact structure:
     outfitChoice,
     outfitDescription: data.outfitDescription ?? "",
     wrestlingPersona: data.wrestlingPersona,
+    personality,
     imagePrompt: data.imagePrompt ?? `Fighter portrait of ${name}`,
   };
 }
@@ -240,6 +279,7 @@ Fighter 1: ${fighter1.name} (${fighter1.nickname})
 - Strengths: ${fighter1.strengths.join(", ")}
 - Weaknesses: ${fighter1.weaknesses.join(", ")}
 - Signature Quote: "${fighter1.signatureQuote}"
+- Personality Traits: aggression ${fighter1.personality?.aggression ?? "unknown"}, cowardice ${fighter1.personality?.cowardice ?? "unknown"}, showmanship ${fighter1.personality?.showmanship ?? "unknown"}, humor ${fighter1.personality?.humor ?? "unknown"}, dirty fighting ${fighter1.personality?.dirtyFighting ?? "unknown"}, sportsmanship ${fighter1.personality?.sportsmanship ?? "unknown"}, risk taking ${fighter1.personality?.riskTaking ?? "unknown"}, temper ${fighter1.personality?.temper ?? "unknown"}
 - Fun Facts: ${fighter1.funFacts.join("; ")}
 
 Fighter 2: ${fighter2.name} (${fighter2.nickname})
@@ -251,6 +291,7 @@ Fighter 2: ${fighter2.name} (${fighter2.nickname})
 - Strengths: ${fighter2.strengths.join(", ")}
 - Weaknesses: ${fighter2.weaknesses.join(", ")}
 - Signature Quote: "${fighter2.signatureQuote}"
+- Personality Traits: aggression ${fighter2.personality?.aggression ?? "unknown"}, cowardice ${fighter2.personality?.cowardice ?? "unknown"}, showmanship ${fighter2.personality?.showmanship ?? "unknown"}, humor ${fighter2.personality?.humor ?? "unknown"}, dirty fighting ${fighter2.personality?.dirtyFighting ?? "unknown"}, sportsmanship ${fighter2.personality?.sportsmanship ?? "unknown"}, risk taking ${fighter2.personality?.riskTaking ?? "unknown"}, temper ${fighter2.personality?.temper ?? "unknown"}
 - Fun Facts: ${fighter2.funFacts.join("; ")}
 
 CRITICAL RULES:
