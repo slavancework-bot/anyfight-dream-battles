@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -19,13 +18,37 @@ import { useColors } from "@/hooks/useColors";
 import { useTTS } from "@/hooks/useTTS";
 import { FighterCard } from "@/components/FighterCard";
 import { FighterPortrait } from "@/components/FighterPortrait";
-import { StatBar } from "@/components/StatBar";
+import type { BattleNarration, Fighter, MatchupAnalysis } from "@/types";
+
+const ARCADE = {
+  black: "#030303",
+  panel: "#080808",
+  gold: "#f2b92f",
+  red: "#e52e21",
+  purple: "#9d4edd",
+  white: "#f7efe0",
+  border: "#4b4435",
+  textMuted: "#b7aa8d",
+};
+
+type ReadSection = "all" | "analysis" | "stats" | "advantages";
+
+function buildQuickNarration(fighter1: Fighter, fighter2: Fighter, analysis: MatchupAnalysis): BattleNarration {
+  return {
+    intro: `The crowd is already loud as ${fighter1.name} and ${fighter2.name} step into the AnyFight ring.`,
+    fighter1Intro: `${fighter1.name}, "${fighter1.nickname || "The Contender"}", comes in with ${fighter1.fightingStyle} and the dangerous ${fighter1.signatureMove}.`,
+    fighter2Intro: `${fighter2.name}, "${fighter2.nickname || "The Contender"}", answers with ${fighter2.fightingStyle} and the dangerous ${fighter2.signatureMove}.`,
+    crowdAtmosphere: `${analysis.predictedWinner} is favored, but this arcade crowd wants chaos, counters, and a ridiculous finish.`,
+    fullNarration: `${fighter1.name} faces ${fighter2.name} in a fast AnyFight dream battle. ${analysis.fightStyle}`,
+  };
+}
 
 export default function MatchupScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { fighter1, fighter2, analysis, setNarration } = useBattle();
   const [loading, setLoading] = useState(false);
+  const [activeReadSection, setActiveReadSection] = useState<ReadSection | null>(null);
 
   const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
   const { speak, stop, isPlaying, isLoading: ttsLoading } = useTTS(domain);
@@ -41,42 +64,69 @@ export default function MatchupScreen() {
     );
   }
 
-  const handleToggleRead = () => {
-    if (!analysis) return;
-    if (isPlaying) {
+  const buildSectionText = (section: ReadSection) => {
+    if (!analysis) return "";
+    const analysisText = [
+      "Fight analysis.",
+      analysis.narrativeExplanation,
+      `Fight style: ${analysis.fightStyle}.`,
+      `Predicted winner: ${analysis.predictedWinner} with ${analysis.winnerWinPercentage}% win chance.`,
+    ].join(" ");
+    const statsText = [
+      "Stat comparison.",
+      `Power: ${fighter1.name} ${analysis.powerComparison.fighter1Value}, ${fighter2.name} ${analysis.powerComparison.fighter2Value}.`,
+      `Speed: ${fighter1.name} ${analysis.speedComparison.fighter1Value}, ${fighter2.name} ${analysis.speedComparison.fighter2Value}.`,
+      `Intelligence: ${fighter1.name} ${analysis.intelligenceComparison.fighter1Value}, ${fighter2.name} ${analysis.intelligenceComparison.fighter2Value}.`,
+      `Special moves: ${analysis.specialMoveComparison}`,
+    ].join(" ");
+    const advantagesText = [
+      "Advantages.",
+      `${fighter1.name}: ${analysis.fighter1Advantages.join(". ")}.`,
+      `${fighter2.name}: ${analysis.fighter2Advantages.join(". ")}.`,
+    ].join(" ");
+
+    if (section === "analysis") return analysisText;
+    if (section === "stats") return statsText;
+    if (section === "advantages") return advantagesText;
+    return [analysisText, statsText, advantagesText].join(" ");
+  };
+
+  const handleToggleRead = (section: ReadSection) => {
+    const isSectionActive = activeReadSection === section && (isPlaying || ttsLoading);
+    if (isSectionActive) {
       stop();
+      setActiveReadSection(null);
     } else {
-      const text = [
-        analysis.narrativeExplanation,
-        `Fight style: ${analysis.fightStyle}.`,
-        `Special moves: ${analysis.specialMoveComparison}`,
-        `Predicted winner: ${analysis.predictedWinner} with ${analysis.winnerWinPercentage}% win chance.`,
-      ].join(" ");
-      speak(text, "nova");
+      stop();
+      setActiveReadSection(section);
+      speak(buildSectionText(section), "nova");
     }
   };
 
   const handleFight = async () => {
+    if (loading) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setLoading(true);
-    try {
-      const res = await fetch(`https://${domain}/api/battle/narration`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fighter1, fighter2 }),
+    setNarration(buildQuickNarration(fighter1, fighter2, analysis));
+    setLoading(false);
+    router.push("/narration");
+
+    fetch(`https://${domain}/api/battle/narration`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fighter1, fighter2 }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("narration failed");
+        return res.json() as Promise<BattleNarration>;
+      })
+      .then((narration) => {
+        setNarration(narration);
+      })
+      .catch(() => {
       });
-      if (!res.ok) throw new Error();
-      const narration = await res.json();
-      setNarration(narration);
-      router.push("/narration");
-    } catch {
-      Alert.alert("Error", "Failed to generate battle intro. Try again.");
-    } finally {
-      setLoading(false);
-    }
   };
 
-  const totalVotes = analysis.winnerWinPercentage + analysis.loserWinPercentage;
   const f1Pct = analysis.predictedWinner === fighter1.name ? analysis.winnerWinPercentage : analysis.loserWinPercentage;
   const f2Pct = analysis.predictedWinner === fighter2.name ? analysis.winnerWinPercentage : analysis.loserWinPercentage;
 
@@ -88,25 +138,27 @@ export default function MatchupScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
+      <LinearGradient colors={["#050505", "#0b0b0d", "#050505"]} style={StyleSheet.absoluteFill} />
+      <View style={styles.scanlines} pointerEvents="none" />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0), backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+          <Ionicons name="chevron-back" size={22} color={ARCADE.white} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>MATCHUP ANALYSIS</Text>
-        <Pressable onPress={handleToggleRead} style={styles.speakerBtn} hitSlop={10}>
+        <Text style={styles.headerTitle}>MATCHUP CARD</Text>
+        <Pressable onPress={() => handleToggleRead("all")} style={styles.speakerBtn} hitSlop={10}>
           <Ionicons
-            name={ttsLoading ? "hourglass-outline" : isPlaying ? "volume-high" : "volume-mute"}
+            name={ttsLoading && activeReadSection === "all" ? "hourglass-outline" : isPlaying && activeReadSection === "all" ? "volume-high" : "volume-mute"}
             size={22}
-            color={isPlaying ? colors.neonPurple : colors.mutedForeground}
+            color={isPlaying && activeReadSection === "all" ? colors.neonPurple : colors.mutedForeground}
           />
         </Pressable>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Prediction Banner */}
-        <View style={[styles.predictionBanner, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View style={styles.predictionBanner}>
           {/* Side-by-side portraits */}
           <View style={styles.portraitsRow}>
             <View style={styles.portraitSide}>
@@ -116,7 +168,7 @@ export default function MatchupScreen() {
               </Text>
             </View>
             <View style={styles.portraitCenter}>
-              <Text style={[styles.predictionLabel, { color: colors.mutedForeground }]}>AI PREDICTION</Text>
+              <Text style={styles.predictionLabel}>ODDS BOARD</Text>
               <Text style={[styles.predictedWinner, { color: colors.neonYellow }]}>{analysis.predictedWinner.split(" ")[0].toUpperCase()} WINS</Text>
               <View style={[styles.diffBadge, { backgroundColor: (difficultyColor[analysis.fightDifficulty] ?? colors.primary) + "22", borderColor: difficultyColor[analysis.fightDifficulty] ?? colors.primary }]}>
                 <Text style={[styles.diffText, { color: difficultyColor[analysis.fightDifficulty] ?? colors.primary }]}>{analysis.fightDifficulty}</Text>
@@ -134,7 +186,7 @@ export default function MatchupScreen() {
               {f1Pct}%
             </Text>
             <View style={styles.predictionCenter}>
-              <Text style={[styles.predictionLabel, { color: colors.mutedForeground }]}>WIN CHANCE</Text>
+              <Text style={styles.predictionLabel}>WIN CHANCE</Text>
             </View>
             <Text style={[styles.fighterPct, { color: f2Pct >= f1Pct ? colors.neonGreen : colors.mutedForeground }]}>
               {f2Pct}%
@@ -152,8 +204,15 @@ export default function MatchupScreen() {
         </View>
 
         {/* Narrative */}
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>FIGHT ANALYSIS</Text>
+        <View style={[styles.section, activeReadSection === "analysis" && (isPlaying || ttsLoading) && styles.activeReadSection]}>
+          <SectionHeader
+            title="FIGHT ANALYSIS"
+            section="analysis"
+            activeSection={activeReadSection}
+            isPlaying={isPlaying}
+            isLoading={ttsLoading}
+            onPress={handleToggleRead}
+          />
           <Text style={[styles.narrative, { color: colors.mutedForeground }]}>{analysis.narrativeExplanation}</Text>
           <Text style={[styles.fightStyle, { color: colors.secondary }]}>
             <Ionicons name="flash" size={12} color={colors.secondary} /> {analysis.fightStyle}
@@ -161,8 +220,15 @@ export default function MatchupScreen() {
         </View>
 
         {/* Stat Comparisons */}
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>STAT COMPARISON</Text>
+        <View style={[styles.section, activeReadSection === "stats" && (isPlaying || ttsLoading) && styles.activeReadSection]}>
+          <SectionHeader
+            title="STAT COMPARISON"
+            section="stats"
+            activeSection={activeReadSection}
+            isPlaying={isPlaying}
+            isLoading={ttsLoading}
+            onPress={handleToggleRead}
+          />
           <ComparisonRow
             label="POWER"
             f1Name={fighter1.name}
@@ -190,31 +256,41 @@ export default function MatchupScreen() {
             color={colors.neonYellow}
             colors={colors}
           />
-          <View style={[styles.specialMove, { backgroundColor: colors.muted, borderRadius: 8 }]}>
+          <View style={styles.specialMove}>
             <Text style={[styles.smLabel, { color: colors.mutedForeground }]}>SPECIAL MOVES</Text>
             <Text style={[styles.smText, { color: colors.text }]}>{analysis.specialMoveComparison}</Text>
           </View>
         </View>
 
         {/* Advantages */}
-        <View style={styles.advantagesRow}>
-          <View style={[styles.advantageCol, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.advHeader, { color: colors.neonBlue }]}>{fighter1.name.split(" ")[0].toUpperCase()}</Text>
-            {analysis.fighter1Advantages.map((a, i) => (
-              <View key={i} style={styles.advItem}>
-                <Ionicons name="checkmark-circle" size={13} color={colors.neonGreen} />
-                <Text style={[styles.advText, { color: colors.mutedForeground }]}>{a}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={[styles.advantageCol, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.advHeader, { color: colors.neonPurple }]}>{fighter2.name.split(" ")[0].toUpperCase()}</Text>
-            {analysis.fighter2Advantages.map((a, i) => (
-              <View key={i} style={styles.advItem}>
-                <Ionicons name="checkmark-circle" size={13} color={colors.neonGreen} />
-                <Text style={[styles.advText, { color: colors.mutedForeground }]}>{a}</Text>
-              </View>
-            ))}
+        <View style={[styles.section, activeReadSection === "advantages" && (isPlaying || ttsLoading) && styles.activeReadSection]}>
+          <SectionHeader
+            title="ADVANTAGES"
+            section="advantages"
+            activeSection={activeReadSection}
+            isPlaying={isPlaying}
+            isLoading={ttsLoading}
+            onPress={handleToggleRead}
+          />
+          <View style={styles.advantagesRow}>
+            <View style={styles.advantageCol}>
+              <Text style={[styles.advHeader, { color: colors.neonBlue }]}>{fighter1.name.split(" ")[0].toUpperCase()}</Text>
+              {analysis.fighter1Advantages.map((a, i) => (
+                <View key={i} style={styles.advItem}>
+                  <Ionicons name="checkmark-circle" size={13} color={colors.neonGreen} />
+                  <Text style={[styles.advText, { color: colors.mutedForeground }]}>{a}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.advantageCol}>
+              <Text style={[styles.advHeader, { color: colors.neonPurple }]}>{fighter2.name.split(" ")[0].toUpperCase()}</Text>
+              {analysis.fighter2Advantages.map((a, i) => (
+                <View key={i} style={styles.advItem}>
+                  <Ionicons name="checkmark-circle" size={13} color={colors.neonGreen} />
+                  <Text style={[styles.advText, { color: colors.mutedForeground }]}>{a}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -229,21 +305,48 @@ export default function MatchupScreen() {
       </ScrollView>
 
       {/* Fight Button */}
-      <View style={[styles.fightButtonContainer, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background, borderTopColor: colors.border }]}>
+      <View style={[styles.fightButtonContainer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable onPress={handleFight} disabled={loading} style={({ pressed }) => [styles.fightBtn, { opacity: pressed ? 0.85 : 1 }]}>
-          <LinearGradient colors={[colors.accent, colors.neonRed]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fightGradient}>
+          <LinearGradient colors={[ARCADE.red, ARCADE.gold]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fightGradient}>
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <View style={styles.fightRow}>
                 <Ionicons name="flame" size={20} color="#fff" />
-                <Text style={styles.fightText}>FIGHT NOW</Text>
+                <Text style={styles.fightText}>PRESS START TO FIGHT</Text>
                 <Ionicons name="flame" size={20} color="#fff" />
               </View>
             )}
           </LinearGradient>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+function SectionHeader({ title, section, activeSection, isPlaying, isLoading, onPress }: {
+  title: string;
+  section: ReadSection;
+  activeSection: ReadSection | null;
+  isPlaying: boolean;
+  isLoading: boolean;
+  onPress: (section: ReadSection) => void;
+}) {
+  const active = activeSection === section && (isPlaying || isLoading);
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Pressable
+        onPress={() => onPress(section)}
+        style={[styles.sectionSpeakerBtn, active && styles.sectionSpeakerActive]}
+        hitSlop={10}
+      >
+        <Ionicons
+          name={isLoading && activeSection === section ? "hourglass-outline" : active ? "volume-high" : "volume-medium-outline"}
+          size={17}
+          color={active ? ARCADE.gold : ARCADE.textMuted}
+        />
+      </Pressable>
     </View>
   );
 }
@@ -271,7 +374,7 @@ function ComparisonRow({ label, f1Name, f2Name, f1Val, f2Val, color, colors }: {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: ARCADE.black },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   backBtn: { marginTop: 12 },
   header: {
@@ -280,12 +383,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingBottom: 12,
-    borderBottomWidth: 1,
+    backgroundColor: ARCADE.black,
+    borderBottomWidth: 2,
+    borderBottomColor: ARCADE.gold,
   },
   backButton: { padding: 6 },
   speakerBtn: { padding: 6 },
-  headerTitle: { fontSize: 14, fontFamily: "Inter_700Bold", letterSpacing: 2 },
-  predictionBanner: { padding: 16, borderBottomWidth: 1 },
+  headerTitle: { color: ARCADE.gold, fontSize: 14, fontFamily: "Inter_700Bold", letterSpacing: 2 },
+  predictionBanner: { padding: 16, borderBottomWidth: 2, borderBottomColor: ARCADE.border, backgroundColor: ARCADE.panel },
   portraitsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   portraitSide: { alignItems: "center", gap: 6, flex: 1 },
   portraitCenter: { alignItems: "center", flex: 1 },
@@ -293,30 +398,58 @@ const styles = StyleSheet.create({
   predictionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   fighterPct: { fontSize: 22, fontFamily: "Inter_700Bold" },
   predictionCenter: { alignItems: "center" },
-  predictionLabel: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 2, marginBottom: 2 },
+  predictionLabel: { color: ARCADE.gold, fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 2, marginBottom: 2 },
   predictedWinner: { fontSize: 14, fontFamily: "Inter_700Bold", letterSpacing: 1, marginBottom: 4 },
-  diffBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1 },
+  diffBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 0, borderWidth: 2 },
   diffText: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  probBar: { height: 8, borderRadius: 4, flexDirection: "row", overflow: "hidden", marginBottom: 6 },
+  probBar: { height: 8, borderRadius: 0, flexDirection: "row", overflow: "hidden", marginBottom: 6 },
   probFill1: { height: "100%" },
   probFill2: { height: "100%" },
   probLabels: { flexDirection: "row", justifyContent: "space-between" },
   probLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
-  section: { margin: 16, marginBottom: 0, padding: 16, borderRadius: 12, borderWidth: 1 },
-  sectionTitle: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 2, marginBottom: 10 },
+  section: { margin: 16, marginBottom: 0, padding: 16, borderRadius: 0, borderWidth: 2, borderColor: ARCADE.border, backgroundColor: ARCADE.panel },
+  activeReadSection: {
+    borderColor: ARCADE.purple,
+    shadowColor: ARCADE.purple,
+    shadowOpacity: 0.75,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 5,
+  },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 },
+  sectionTitle: { color: ARCADE.gold, fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 2 },
+  sectionSpeakerBtn: {
+    width: 32,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: ARCADE.border,
+    backgroundColor: "#111",
+  },
+  sectionSpeakerActive: {
+    borderColor: ARCADE.purple,
+    backgroundColor: "#1c1029",
+    shadowColor: ARCADE.purple,
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
   narrative: { fontSize: 13, lineHeight: 19, fontFamily: "Inter_400Regular", marginBottom: 8 },
   fightStyle: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  advantagesRow: { flexDirection: "row", gap: 8, marginHorizontal: 16, marginTop: 16 },
-  advantageCol: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1 },
+  advantagesRow: { flexDirection: "row", gap: 8 },
+  advantageCol: { flex: 1, padding: 12, borderRadius: 0, borderWidth: 2, borderColor: ARCADE.border, backgroundColor: ARCADE.panel },
   advHeader: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1.5, marginBottom: 8 },
   advItem: { flexDirection: "row", alignItems: "flex-start", gap: 4, marginBottom: 4 },
   advText: { fontSize: 11, fontFamily: "Inter_400Regular", flex: 1, lineHeight: 15 },
-  specialMove: { padding: 10, marginTop: 4 },
+  specialMove: { padding: 10, marginTop: 4, backgroundColor: "#111", borderWidth: 1, borderColor: ARCADE.border },
   smLabel: { fontSize: 9, fontFamily: "Inter_600SemiBold", letterSpacing: 1, marginBottom: 3 },
   smText: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 16 },
-  fightButtonContainer: { padding: 16, borderTopWidth: 1 },
-  fightBtn: { borderRadius: 12, overflow: "hidden" },
+  fightButtonContainer: { padding: 16, borderTopWidth: 2, borderTopColor: ARCADE.gold, backgroundColor: ARCADE.black },
+  fightBtn: { borderRadius: 0, overflow: "hidden", borderWidth: 2, borderColor: ARCADE.gold },
   fightGradient: { paddingVertical: 16, alignItems: "center" },
   fightRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   fightText: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 3 },
+  scanlines: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,255,255,0.035)", opacity: 0.35 },
 });

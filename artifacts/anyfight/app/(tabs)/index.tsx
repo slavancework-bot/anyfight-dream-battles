@@ -25,6 +25,17 @@ const OUTFIT_OPTIONS: { key: OutfitChoice; label: string; icon: keyof typeof Ion
   { key: "wrestling", label: "Wrestling", icon: "trophy-outline" },
 ];
 
+const ARCADE = {
+  black: "#030303",
+  panel: "#080808",
+  gold: "#f2b92f",
+  red: "#e52e21",
+  blue: "#1267dd",
+  white: "#f7efe0",
+  muted: "#1a1a1a",
+  textMuted: "#b7aa8d",
+};
+
 async function apiFetchFighter(name: string, outfit: OutfitChoice, domain: string): Promise<Fighter> {
   const res = await fetch(`https://${domain}/api/fighters/generate`, {
     method: "POST",
@@ -62,6 +73,8 @@ export default function CreateScreen() {
   const [outfit2, setOutfit2] = useState<OutfitChoice>("signature");
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
+  const [suggestions, setSuggestions] = useState<[string, string][]>(() => getRandomSuggestions());
+  const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
 
   const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
 
@@ -110,10 +123,10 @@ export default function CreateScreen() {
     }
   };
 
-  const bgColor = colors.background;
-
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }]}>
+    <View style={styles.container}>
+      <LinearGradient colors={["#050505", "#0b0b0d", "#050505"]} style={StyleSheet.absoluteFill} />
+      <View style={styles.scanlines} pointerEvents="none" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[
@@ -128,43 +141,36 @@ export default function CreateScreen() {
       >
         {/* Logo */}
         <View style={styles.logoArea}>
-          <LinearGradient
-            colors={[colors.neonBlue, colors.neonPurple]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.logoGradient}
-          >
-            <Text style={styles.logoText}>ANYFIGHT</Text>
-          </LinearGradient>
-          <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
-            ANY PERSON · ANY CHARACTER · ANY BATTLE
-          </Text>
+          <View style={styles.leagueBadge}>
+            <Text style={styles.leagueText}>A.B.A.</Text>
+          </View>
+          <Text style={styles.logoText}>ANYFIGHT BOXING</Text>
+          <Text style={styles.tagline}>ANY PERSON / ANY CHARACTER / ANY BOUT</Text>
         </View>
 
         {/* Fighter 1 */}
         <FighterInput
-          label="FIGHTER 1"
+          label="1P CONTENDER"
           placeholder="Batman, Mike Tyson, Zeus..."
           value={name1}
           onChangeText={setName1}
           outfit={outfit1}
           onOutfitChange={setOutfit1}
           accentColor={colors.neonBlue}
-          colors={colors}
         />
 
         {/* VS Divider */}
         <View style={styles.vsDivider}>
-          <View style={[styles.vsLine, { backgroundColor: colors.border }]} />
-          <View style={[styles.vsCircle, { backgroundColor: colors.card, borderColor: colors.accent }]}>
-            <Text style={[styles.vsText, { color: colors.accent }]}>VS</Text>
+          <View style={styles.vsLine} />
+          <View style={styles.vsCircle}>
+            <Text style={styles.vsText}>VS</Text>
           </View>
-          <View style={[styles.vsLine, { backgroundColor: colors.border }]} />
+          <View style={styles.vsLine} />
         </View>
 
         {/* Fighter 2 */}
         <FighterInput
-          label="FIGHTER 2"
+          label="2P CONTENDER"
           placeholder='Iron Man, Goku... or "random"'
           value={name2}
           onChangeText={setName2}
@@ -172,7 +178,6 @@ export default function CreateScreen() {
           onOutfitChange={setOutfit2}
           accentColor={colors.neonPurple}
           hint='Try: "random" or "arch nemesis"'
-          colors={colors}
         />
 
         {/* Generate Button */}
@@ -182,7 +187,7 @@ export default function CreateScreen() {
           style={({ pressed }) => [styles.generateBtn, { opacity: pressed ? 0.85 : 1 }]}
         >
           <LinearGradient
-            colors={loading ? [colors.muted, colors.muted] : [colors.primary, colors.secondary]}
+            colors={loading ? [ARCADE.muted, ARCADE.muted] : [ARCADE.red, ARCADE.gold]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.generateGradient}
@@ -195,34 +200,65 @@ export default function CreateScreen() {
             ) : (
               <View style={styles.loadingRow}>
                 <Ionicons name="flash" size={18} color="#fff" />
-                <Text style={styles.generateBtnText}>GENERATE BATTLE</Text>
+                <Text style={styles.generateBtnText}>INSERT COIN - GENERATE BOUT</Text>
               </View>
             )}
           </LinearGradient>
         </Pressable>
 
-        {/* Quick suggestions */}
-        <Text style={[styles.suggestTitle, { color: colors.mutedForeground }]}>DREAM BATTLES</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.suggestions}>
-          {SUGGESTIONS.map((s, i) => (
+        {/* Dream Bouts Grid */}
+        <View style={styles.suggestHeader}>
+          <Text style={styles.suggestTitle}>DREAM BOUTS</Text>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSuggestions(getRandomSuggestions());
+              setSelectedSuggestion(null);
+            }}
+            style={styles.shuffleBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Shuffle dream bouts"
+            testID="shuffle-dream-bouts"
+          >
+            <Ionicons name="shuffle" size={14} color={ARCADE.gold} />
+            <Text style={styles.shuffleText}>SHUFFLE</Text>
+          </Pressable>
+        </View>
+        <View style={styles.grid}>
+          {suggestions.map((s) => {
+            const suggestionKey = s.join(" vs ");
+            const isSelected = selectedSuggestion === suggestionKey;
+            return (
             <Pressable
-              key={i}
+              key={suggestionKey}
               onPress={() => {
+                Haptics.selectionAsync();
                 setName1(s[0]);
                 setName2(s[1]);
+                setSelectedSuggestion(suggestionKey);
               }}
-              style={[styles.suggestionChip, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={({ pressed }) => [
+                styles.gridCard,
+                isSelected && styles.gridCardSelected,
+                { opacity: pressed ? 0.75 : 1 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Choose ${s[0]} versus ${s[1]}`}
+              testID={`dream-bout-${s[0].toLowerCase().replace(/\W+/g, "-")}-${s[1].toLowerCase().replace(/\W+/g, "-")}`}
             >
-              <Text style={[styles.suggestionText, { color: colors.text }]}>{s[0]} vs {s[1]}</Text>
+              <Text style={styles.gridFighter1} numberOfLines={1}>{s[0]}</Text>
+              <View style={styles.gridVs}><Text style={styles.gridVsText}>VS</Text></View>
+              <Text style={styles.gridFighter2} numberOfLines={1}>{s[1]}</Text>
             </Pressable>
-          ))}
-        </ScrollView>
+            );
+          })}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
-const SUGGESTIONS = [
+const ALL_SUGGESTIONS: [string, string][] = [
   ["Batman", "Iron Man"],
   ["Goku", "Superman"],
   ["Mike Tyson", "Muhammad Ali"],
@@ -231,7 +267,62 @@ const SUGGESTIONS = [
   ["Abraham Lincoln", "Julius Caesar"],
   ["King Kong", "Godzilla"],
   ["Sherlock Holmes", "James Bond"],
+  ["LeBron James", "Michael Jordan"],
+  ["Kobe Bryant", "Larry Bird"],
+  ["Drake", "Kendrick Lamar"],
+  ["Jay-Z", "Eminem"],
+  ["Tupac", "Biggie Smalls"],
+  ["Nicki Minaj", "Cardi B"],
+  ["Napoleon Bonaparte", "Alexander the Great"],
+  ["Genghis Khan", "Attila the Hun"],
+  ["Cleopatra", "Joan of Arc"],
+  ["Achilles", "Hercules"],
+  ["Wolverine", "Captain America"],
+  ["Spider-Man", "The Flash"],
+  ["Thanos", "Darth Vader"],
+  ["Gandalf", "Dumbledore"],
+  ["Sherlock Holmes", "Hercule Poirot"],
+  ["James Bond", "Jason Bourne"],
+  ["Bruce Lee", "Muhammad Ali"],
+  ["Conor McGregor", "Floyd Mayweather"],
+  ["Mike Tyson", "Jake Paul"],
+  ["Rocky Balboa", "Ivan Drago"],
+  ["Yoda", "Dumbledore"],
+  ["John Wick", "James Bond"],
+  ["Neo", "John Wick"],
+  ["Terminator", "RoboCop"],
+  ["Predator", "Alien"],
+  ["Freddy Krueger", "Jason Voorhees"],
+  ["Chucky", "Pennywise"],
+  ["Donald Trump", "Joe Biden"],
+  ["Elon Musk", "Jeff Bezos"],
+  ["Steve Jobs", "Bill Gates"],
+  ["Oprah", "Ellen DeGeneres"],
+  ["Taylor Swift", "Beyoncé"],
+  ["Michael Jackson", "Prince"],
+  ["Elvis Presley", "The Beatles"],
+  ["Marilyn Monroe", "Audrey Hepburn"],
+  ["Ninja", "PewDiePie"],
+  ["Mr. T", "Chuck Norris"],
+  ["Shrek", "Donkey Kong"],
+  ["Pikachu", "Charizard"],
+  ["SpongeBob", "Patrick Star"],
+  ["Bart Simpson", "Stewie Griffin"],
+  ["Bugs Bunny", "Tom Cat"],
+  ["Daenerys Targaryen", "Cersei Lannister"],
+  ["Jon Snow", "Aragorn"],
+  ["Walter White", "Tony Soprano"],
+  ["Hannibal Lecter", "Joker"],
 ];
+
+function getRandomSuggestions(count = 8): [string, string][] {
+  const shuffled = [...ALL_SUGGESTIONS];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled.slice(0, Math.min(count, shuffled.length));
+}
 
 interface FighterInputProps {
   label: string;
@@ -242,23 +333,22 @@ interface FighterInputProps {
   onOutfitChange: (o: OutfitChoice) => void;
   accentColor: string;
   hint?: string;
-  colors: ReturnType<typeof useColors>;
 }
 
-function FighterInput({ label, placeholder, value, onChangeText, outfit, onOutfitChange, accentColor, hint, colors }: FighterInputProps) {
+function FighterInput({ label, placeholder, value, onChangeText, outfit, onOutfitChange, accentColor, hint }: FighterInputProps) {
   return (
-    <View style={[styles.fighterSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[styles.fighterSection, { borderColor: accentColor }]}>
       <Text style={[styles.fighterLabel, { color: accentColor }]}>{label}</Text>
       <TextInput
-        style={[styles.textInput, { color: colors.text, borderColor: accentColor + "55", backgroundColor: colors.muted }]}
+        style={[styles.textInput, { borderColor: accentColor }]}
         placeholder={placeholder}
-        placeholderTextColor={colors.mutedForeground}
+        placeholderTextColor="#8f876f"
         value={value}
         onChangeText={onChangeText}
         autoCapitalize="words"
         returnKeyType="next"
       />
-      {hint && <Text style={[styles.hintText, { color: colors.mutedForeground }]}>{hint}</Text>}
+      {hint && <Text style={styles.hintText}>{hint}</Text>}
       <View style={styles.outfitRow}>
         {OUTFIT_OPTIONS.map((opt) => (
           <Pressable
@@ -267,13 +357,13 @@ function FighterInput({ label, placeholder, value, onChangeText, outfit, onOutfi
             style={[
               styles.outfitBtn,
               {
-                backgroundColor: outfit === opt.key ? accentColor + "22" : colors.muted,
-                borderColor: outfit === opt.key ? accentColor : colors.border,
+                backgroundColor: outfit === opt.key ? accentColor + "22" : ARCADE.muted,
+                borderColor: outfit === opt.key ? accentColor : "#34302a",
               },
             ]}
           >
-            <Ionicons name={opt.icon} size={14} color={outfit === opt.key ? accentColor : colors.mutedForeground} />
-            <Text style={[styles.outfitBtnText, { color: outfit === opt.key ? accentColor : colors.mutedForeground }]}>
+            <Ionicons name={opt.icon} size={14} color={outfit === opt.key ? accentColor : ARCADE.textMuted} />
+            <Text style={[styles.outfitBtnText, { color: outfit === opt.key ? accentColor : ARCADE.textMuted }]}>
               {opt.label}
             </Text>
           </Pressable>
@@ -284,34 +374,53 @@ function FighterInput({ label, placeholder, value, onChangeText, outfit, onOutfi
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: ARCADE.black },
   content: { paddingHorizontal: 16 },
   logoArea: { alignItems: "center", marginBottom: 28, marginTop: 8 },
-  logoGradient: { paddingHorizontal: 20, paddingVertical: 6, borderRadius: 6, marginBottom: 6 },
-  logoText: {
-    fontSize: 40,
-    fontFamily: "Inter_700Bold",
-    color: "#fff",
-    letterSpacing: 6,
+  leagueBadge: {
+    borderWidth: 2,
+    borderColor: ARCADE.gold,
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    marginBottom: 8,
+    backgroundColor: ARCADE.panel,
   },
-  tagline: { fontSize: 10, letterSpacing: 3, fontFamily: "Inter_500Medium", textTransform: "uppercase" },
+  leagueText: {
+    color: ARCADE.gold,
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 3,
+  },
+  logoText: {
+    fontSize: 32,
+    fontFamily: "Inter_700Bold",
+    color: ARCADE.white,
+    letterSpacing: 3,
+    textAlign: "center",
+    textShadowColor: ARCADE.red,
+    textShadowRadius: 5,
+  },
+  tagline: { color: ARCADE.gold, fontSize: 10, letterSpacing: 2, fontFamily: "Inter_700Bold", textTransform: "uppercase", textAlign: "center", marginTop: 6 },
   fighterSection: {
-    borderRadius: 12,
+    backgroundColor: ARCADE.panel,
+    borderRadius: 0,
     padding: 14,
-    borderWidth: 1,
+    borderWidth: 2,
     marginBottom: 8,
   },
   fighterLabel: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 2, marginBottom: 8 },
   textInput: {
     height: 48,
-    borderRadius: 8,
-    borderWidth: 1.5,
+    borderRadius: 0,
+    borderWidth: 2,
     paddingHorizontal: 14,
     fontSize: 16,
     fontFamily: "Inter_500Medium",
     marginBottom: 8,
+    color: ARCADE.white,
+    backgroundColor: "#111",
   },
-  hintText: { fontSize: 11, marginBottom: 8, fontFamily: "Inter_400Regular" },
+  hintText: { color: ARCADE.textMuted, fontSize: 11, marginBottom: 8, fontFamily: "Inter_400Regular" },
   outfitRow: { flexDirection: "row", gap: 6 },
   outfitBtn: {
     flex: 1,
@@ -320,41 +429,86 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
     paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 0,
+    borderWidth: 2,
   },
   outfitBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   vsDivider: { flexDirection: "row", alignItems: "center", marginVertical: 4 },
-  vsLine: { flex: 1, height: 1 },
+  vsLine: { flex: 1, height: 2, backgroundColor: "#4b4435" },
   vsCircle: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 0,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
     marginHorizontal: 12,
+    backgroundColor: ARCADE.panel,
+    borderColor: ARCADE.gold,
   },
-  vsText: { fontSize: 14, fontFamily: "Inter_700Bold", letterSpacing: 1 },
-  generateBtn: { marginTop: 16, borderRadius: 12, overflow: "hidden" },
+  vsText: { color: ARCADE.gold, fontSize: 14, fontFamily: "Inter_700Bold", letterSpacing: 1 },
+  generateBtn: { marginTop: 16, borderRadius: 0, overflow: "hidden", borderWidth: 2, borderColor: ARCADE.gold },
   generateGradient: { paddingVertical: 16, alignItems: "center" },
   loadingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  generateBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 2 },
+  generateBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1, textAlign: "center" },
+  suggestHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 24,
+    marginBottom: 10,
+  },
   suggestTitle: {
+    color: ARCADE.gold,
     fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 2,
     textTransform: "uppercase",
-    marginTop: 24,
-    marginBottom: 10,
   },
-  suggestions: { marginBottom: 12 },
-  suggestionChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+  shuffleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 2,
+    borderColor: ARCADE.gold,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: ARCADE.panel,
+  },
+  shuffleText: { color: ARCADE.gold, fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1 },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  gridCard: {
+    width: "48%",
+    backgroundColor: ARCADE.panel,
+    borderWidth: 2,
+    borderColor: "#4b4435",
+    padding: 12,
+    alignItems: "center",
+    gap: 4,
+  },
+  gridCardSelected: {
+    borderColor: "#9d4edd",
+    backgroundColor: "#160e1f",
+    shadowColor: "#9d4edd",
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  gridFighter1: { color: ARCADE.white, fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "center" },
+  gridVs: {
+    backgroundColor: "#1a1306",
     borderWidth: 1,
-    marginRight: 8,
+    borderColor: ARCADE.gold,
+    paddingHorizontal: 8,
+    paddingVertical: 1,
   },
-  suggestionText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  gridVsText: { color: ARCADE.gold, fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 2 },
+  gridFighter2: { color: ARCADE.textMuted, fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "center" },
+  scanlines: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,255,255,0.035)", opacity: 0.35 },
 });
